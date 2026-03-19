@@ -1,0 +1,19 @@
+[project]
+name = "py-coding-agent"
+version = "0.1.0"
+description = "A Dockerized Python coding agent with dynamic tools and Ollama integration."
+authors = [{name = "Sankar Ramamoorthy"}]
+requires-python = ">=3.10"
+
+dependencies = [
+    "requests",
+    "pandas",
+    "rich"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["py_mono*"]
