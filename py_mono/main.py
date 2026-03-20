@@ -15,6 +15,8 @@ from py_mono.tools.edit_file import edit_tool
 from py_mono.tools.shell import shell_tool
 from py_mono.tools.uv_tool import uv_tool
 from py_mono.tools.create_tool import create_tool_tool
+from tools.list_files import list_files_tool
+
 from py_mono.tools.tool_loader import load_dynamic_tools
 from py_mono.ui.cli import start_cli
 
@@ -29,7 +31,8 @@ def main():
         edit_tool,
         shell_tool,
         uv_tool,
-        create_tool_tool
+        create_tool_tool,
+        list_files_tool
     ]
 
     # Load dynamic tools from dynamic_tools folder

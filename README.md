@@ -1,42 +1,51 @@
-Here’s a **clean, professional, recruiter-ready README.md** that reflects what you’ve actually built (including native tool calling and current limitations).
+#  py-coding-agent
 
----
-
-# 📄 README.md
-
-# 🧠 py-coding-agent
-
-A Dockerized Python coding agent that uses an LLM to reason, call tools, and execute tasks inside a sandboxed environment.
+A Dockerized Python coding agent that uses an LLM to reason, call tools, and execute tasks inside a **sandboxed workspace**.
 
 Inspired by autonomous agent systems like pi-mono, this project explores **tool-based reasoning, dynamic code execution, and self-extending capabilities** using local LLMs via Ollama.
 
 ---
 
-## 🚀 Features
+##  Features
 
-### ✅ Core Capabilities
+###  Core Capabilities
 
-* **CLI-driven agent loop**
-* **Multi-step reasoning + execution**
-* **Native LLM tool calling (Ollama `/api/chat`)**
-* **Docker sandbox for safe execution**
-* **Dynamic Python tool creation**
-* **File + shell interaction tools**
+* CLI-driven coding agent
+* Multi-step reasoning + execution loop
+* Native LLM tool calling (Ollama `/api/chat`)
+* **Workspace sandboxing (`/workspace`)**
+* Dynamic Python tool creation
+* File + shell interaction tools
 
 ---
 
-### 🧰 Built-in Tools
+###  Sandboxed Execution
 
+All agent actions are restricted to:
+
+```text
+/workspace
+```
+
+* Prevents access to system files
+* Blocks directory traversal (`../../`)
+* Ensures safe file operations inside Docker
+
+---
+
+###  Built-in Tools
+
+* `list_files` — List files and directories (recursive support)
 * `read_file` — Read file contents
 * `write_file` — Write content to files
 * `edit_file` — Modify files
-* `shell` — Execute shell commands
+* `shell` — Execute shell commands (restricted to workspace)
 * `install_dependency` — Install Python packages via `uv`
 * `create_tool` — Dynamically create new Python tools
 
 ---
 
-### 🧠 LLM Integration
+###  LLM Integration
 
 * Uses **Ollama** for local inference
 * Supports **native tool calling with JSON schemas**
@@ -49,9 +58,9 @@ Inspired by autonomous agent systems like pi-mono, this project explores **tool-
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
-```
+```text
 User (CLI)
    ↓
 Agent Loop
@@ -65,19 +74,20 @@ Result → LLM → Final Answer
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
-```
+```text
 py_mono/
 ├── agent/        # Core agent loop
 ├── llm/          # Ollama provider + tool schemas
 ├── tools/        # Built-in and dynamic tools
+├── utils/        # Path safety + helpers
 ├── ui/           # CLI interface
 ├── config.py     # Environment configuration
 └── main.py       # Entry point
 
 dynamic_tools/    # Runtime-generated tools
-workspace/        # Mounted working directory
+workspace/        # Mounted safe working directory
 ```
 
 ---
@@ -93,7 +103,7 @@ Set-Location py-coding-agent
 
 ---
 
-### 2. Make sure Ollama is running on host
+### 2. Start Ollama on host
 
 ```bash
 ollama serve
@@ -126,29 +136,29 @@ docker run -it `
 
 ---
 
-## 💬 Example Usage
-
-Inside the CLI:
+##  Example Usage
 
 ```text
 > list files
-> read file main.py
-> create a new python file hello.py
-> install requests
+> list files recursively
+> read file py_mono/main.py
+> write file test.py with hello world code
+> run a shell command to list files
 ```
 
 ---
 
-## ⚠️ Current Limitations (V1)
+##  Current Limitations (V1)
 
-* Tool usage is **not always reliably triggered** by the LLM
-* No strict workspace sandboxing yet (planned)
-* No file listing tool (planned)
-* Limited tool validation and error recovery
+* Tool usage is **not always reliably triggered**
+* Limited reasoning over large codebases
+* No persistent memory yet
+* No tool validation or retry logic
+* Output formatting can vary depending on model
 
 ---
 
-## 🛣️ Roadmap
+##  Roadmap
 
 ### Milestone 1 (Core Agent)
 
@@ -156,9 +166,10 @@ Inside the CLI:
 * [x] Base tools (file + shell)
 * [x] CLI interface
 * [x] Native Ollama tool calling
-* [ ] Workspace sandboxing
-* [ ] File listing tool
-* [ ] Reliability improvements
+* [x] Workspace sandboxing
+* [x] File listing tool (`list_files`)
+* [ ] Tool usage reliability improvements
+* [ ] Docstrings and polish
 
 ---
 
@@ -184,7 +195,7 @@ Inside the CLI:
 
 ---
 
-## 🔮 Future Enhancements (V2)
+##  Future Enhancements (V2)
 
 * Multi-agent system (planner / coder / tester)
 * Tool registry + validation
@@ -194,7 +205,7 @@ Inside the CLI:
 
 ---
 
-## 🧠 Key Concepts
+##  Key Concepts
 
 This project explores:
 
@@ -205,10 +216,6 @@ This project explores:
 
 ---
 
-## 📜 License
+##  License
 
 MIT License
-
----
-
-
