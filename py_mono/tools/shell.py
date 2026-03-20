@@ -2,11 +2,24 @@
 from py_mono.tools.tool import Tool
 import subprocess
 
+from py_mono.config import WORKSPACE_ROOT
+
 def run_shell(command):
+    FORBIDDEN = ["rm -rf /", "shutdown", "reboot"]
+
+    if any(bad in command for bad in FORBIDDEN):
+        return "[SECURITY] Command blocked"
+
     result = subprocess.run(
-        command, shell=True, capture_output=True, text=True
+        command,
+        shell=True,
+        capture_output=True,
+        text=True,
+        cwd=str(WORKSPACE_ROOT)  
     )
     return result.stdout + result.stderr
+
+
 
 shell_tool = Tool(
     name="shell",
@@ -23,3 +36,4 @@ shell_tool = Tool(
         "required": ["command"]
     }
 )
+

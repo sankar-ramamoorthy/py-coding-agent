@@ -1,8 +1,13 @@
 from py_mono.tools.tool import Tool
 
+from py_mono.utils.path_utils import resolve_safe_path
+
 def read_file(path):
-    with open(path, "r", encoding="utf-8") as f:
+    safe_path = resolve_safe_path(path)
+
+    with open(safe_path, "r", encoding="utf-8") as f:
         return f.read()
+
 
 read_tool = Tool(
     "read_file",
