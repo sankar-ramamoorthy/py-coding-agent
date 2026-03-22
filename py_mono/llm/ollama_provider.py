@@ -11,7 +11,7 @@ class OllamaProvider:
     Ollama REST provider with debug logs and safe JSON extraction.
     """
     def __init__(self, model=None):
-        self.model = model or os.getenv("OLLAMA_MODEL", "Qwen3:4b")
+        self.model = model or os.getenv("OLLAMA_MODEL", "lfm2.5-thinking:latest")
         self.base_url = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 
     def generate(self, messages, tools=None):

@@ -12,7 +12,7 @@ from pathlib import Path
 
 DEFAULT_LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "granite4:350m")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "lfm2.5-thinking:latest")
 
 
 
