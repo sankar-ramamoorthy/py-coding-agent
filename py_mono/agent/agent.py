@@ -2,18 +2,21 @@
 
 from py_mono.llm.prompts import build_system_prompt
 import json
+import uuid
+
 
 class Agent:
     """
-    Minimal agent loop (pi-mono style) with memory management.
+    Minimal agent loop (pi-mono style) with memory management and provider-agnostic
+    canonical message format (OpenAI-style, per ADR-005).
 
     Responsibilities:
-    - Maintain conversation memory
+    - Maintain conversation memory in canonical format
     - Let LLM decide when to call tools
     - Execute tools
     - Feed results back into loop
     - Return final answer when LLM stops calling tools
-    - Support memory clearing, pruning, auto-pruning, and session termination
+    - Support memory clearing, pruning, auto-pruning, session termination
     """
 
     def __init__(self, llm, tools, max_steps=10, debug=True, auto_prune_after=5, prune_keep_last=20):
@@ -21,7 +24,7 @@ class Agent:
         self.tools = {t.name: t for t in tools}
         self.max_steps = max_steps
         self.debug = debug
-        self.auto_prune_after = auto_prune_after   # prune every N tool calls
+        self.auto_prune_after = auto_prune_after
         self.prune_keep_last = prune_keep_last
 
         # Initialize memory with system prompt only
@@ -30,7 +33,7 @@ class Agent:
             "content": build_system_prompt()
         }]
 
-        # Simple loop guard
+        # Loop guards
         self.last_tool_call = None
         self.repeat_count = 0
         self.tool_call_count = 0
@@ -49,15 +52,21 @@ class Agent:
     # Memory / Session Methods
     # -------------------------
     def clear_memory(self):
-        """Clear all conversation history except system prompt."""
-        self.memory = [msg for msg in self.memory if msg["role"] == "system"]
-        self._log("🗑️ Memory cleared.")
+        """Clear all conversation history except the core system prompt. Reset all loop guards."""
+        self.memory = [{
+            "role": "system",
+            "content": build_system_prompt()
+        }]
+        self.last_tool_call = None
+        self.repeat_count = 0
+        self.tool_call_count = 0
+        self._log("🗑️ Memory fully cleared. Ready for a fresh session.")
 
     def prune_memory(self):
         """Compact memory by keeping only the last N messages (excluding system prompt)."""
         system_msgs = [msg for msg in self.memory if msg["role"] == "system"]
-        user_tool_msgs = [msg for msg in self.memory if msg["role"] != "system"]
-        self.memory = system_msgs + user_tool_msgs[-self.prune_keep_last:]
+        other_msgs = [msg for msg in self.memory if msg["role"] != "system"]
+        self.memory = system_msgs + other_msgs[-self.prune_keep_last:]
         self._log(f"🧹 Memory pruned to last {self.prune_keep_last} messages.")
 
     # -------------------------
@@ -66,15 +75,15 @@ class Agent:
     def run(self, user_input: str):
         """Run the agent for a single user query."""
 
-        # Check for special session commands first
-        if user_input.strip().lower() == "/clear":
+        # Handle session commands
+        user_cmd = user_input.strip().lower()
+        if user_cmd == "/clear":
             self.clear_memory()
             return "✅ Memory cleared. You can start fresh."
-
-        if user_input.strip().lower() == "/bye":
+        if user_cmd == "/bye":
             return "👋 Goodbye! Session ended."
 
-        # Add user message to memory
+        # Add user message
         self.memory.append({
             "role": "user",
             "content": user_input
@@ -102,6 +111,9 @@ class Agent:
                 tool_name = tool_call.get("name")
                 args = tool_call.get("args", {})
 
+                # Generate unique tool_call_id for canonical format (ADR-005)
+                tool_call_id = str(uuid.uuid4())
+
                 # Loop detection
                 current_call = (tool_name, json.dumps(args, sort_keys=True))
                 if current_call == self.last_tool_call:
@@ -110,22 +122,33 @@ class Agent:
                     self.repeat_count = 0
                 self.last_tool_call = current_call
 
-                # Guard against infinite loops
+                # Guard against repeated identical calls
                 if self.repeat_count >= 1:
                     self._log("⚠️ Repeated tool call detected, nudging LLM")
+                    # Use role "user" not "system" to avoid polluting the system prompt slot
                     self.memory.append({
-                        "role": "system",
-                        "content": "You already called this tool with the same arguments. Use the result to answer the user."
+                        "role": "user",
+                        "content": "[AGENT] You already called this tool with the same arguments. Use the result to answer the user."
                     })
                     continue
 
-                # Record assistant tool call
+                # Record assistant tool call in canonical OpenAI-style format (ADR-005)
                 self.memory.append({
                     "role": "assistant",
                     "content": None,
-                    "tool_call": tool_call
+                    "tool_calls": [
+                        {
+                            "id": tool_call_id,
+                            "type": "function",
+                            "function": {
+                                "name": tool_name,
+                                "arguments": args
+                            }
+                        }
+                    ]
                 })
 
+                # Execute the tool
                 tool = self.tools.get(tool_name)
                 if not tool:
                     result = f"[TOOL ERROR] Unknown tool: {tool_name}"
@@ -137,16 +160,14 @@ class Agent:
 
                 self._log(f"TOOL [{tool_name}] RESULT:", result)
 
-                # Record tool result
+                # Record tool result in canonical format (ADR-005)
                 self.memory.append({
                     "role": "tool",
-                    "name": tool_name,
+                    "tool_call_id": tool_call_id,
                     "content": str(result)
                 })
 
-                # -------------------------
-                # Auto-prune memory
-                # -------------------------
+                # Auto-prune memory if needed
                 if self.tool_call_count % self.auto_prune_after == 0:
                     self.prune_memory()
 

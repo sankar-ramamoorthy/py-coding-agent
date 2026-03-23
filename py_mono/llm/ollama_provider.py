@@ -1,32 +1,108 @@
 # py_mono/llm/ollama_provider.py
+
 import os
 import requests
-import json
+from py_mono.llm.base import LLMProvider
 from py_mono.llm.tool_schema import build_tool_schemas
 
 DEBUG = True  # Set to False to silence debug logs
 
-class OllamaProvider:
+
+class OllamaProvider(LLMProvider):
     """
-    Ollama REST provider with debug logs and safe JSON extraction.
+    Ollama REST provider.
+
+    Translates canonical OpenAI-style memory format (ADR-005) to Ollama wire format
+    before sending, and normalizes Ollama responses back to the canonical dict.
     """
+
     def __init__(self, model=None):
         self.model = model or os.getenv("OLLAMA_MODEL", "lfm2.5-thinking:latest")
         self.base_url = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 
-    def generate(self, messages, tools=None):
+    def to_wire_messages(self, messages: list) -> list:
+        """
+        Translate canonical OpenAI-style messages to Ollama wire format.
+
+        Key differences vs canonical format:
+        - assistant content must be "" not None
+        - tool_calls list uses {"function": {"name", "arguments"}} with no "id" or "type"
+        - tool result messages drop tool_call_id
+        - nudge messages with role "user" pass through unchanged
+        """
+        wire = []
+        for msg in messages:
+            role = msg.get("role")
+
+            if role == "assistant" and msg.get("tool_calls"):
+                # Translate canonical tool_calls → Ollama tool_calls
+                wire.append({
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": tc["function"]["name"],
+                                "arguments": tc["function"]["arguments"]
+                            }
+                        }
+                        for tc in msg["tool_calls"]
+                    ]
+                })
+
+            elif role == "tool":
+                # Ollama tool results drop tool_call_id
+                wire.append({
+                    "role": "tool",
+                    "content": msg.get("content", "")
+                })
+
+            else:
+                # system, user, assistant text — pass through as-is
+                wire.append(msg)
+
+        return wire
+
+    def generate(self, messages: list, tools=None) -> dict:
+        """
+        Send messages to Ollama and return normalized response.
+
+        Args:
+            messages: Canonical OpenAI-style message list
+            tools: List of Tool objects
+
+        Returns:
+            {"text": str | None, "tool_call": {"name": str, "args": dict} | None}
+        """
+        wire_messages = self.to_wire_messages(messages)
+
         payload = {
             "model": self.model,
-            "messages": messages,
+            "messages": wire_messages,
             "stream": False
         }
         if tools:
             payload["tools"] = build_tool_schemas(tools)
 
-        resp = requests.post(f"{self.base_url}/api/chat", json=payload, timeout=300)
+        if DEBUG:
+            import json
+            print(f"[DEBUG] Sending to Ollama:\n{json.dumps(payload, indent=2)}\n")
+
+        resp = requests.post(
+            f"{self.base_url}/api/chat",
+            json=payload,
+            timeout=300
+        )
+        resp.raise_for_status()
         data = resp.json()
+
+        if DEBUG:
+            import json
+            print(f"[DEBUG] Ollama response:\n{json.dumps(data, indent=2)}\n")
+
         message = data.get("message", {})
 
+        # Tool call response
         tool_calls = message.get("tool_calls")
         if tool_calls:
             call = tool_calls[0]["function"]
@@ -37,40 +113,9 @@ class OllamaProvider:
                     "args": call["arguments"]
                 }
             }
-        return {"text": message.get("content", ""), "tool_call": None}
-        
 
-    def generate_old(self, messages, tools=None):
-        prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
-        if DEBUG:
-            print(f"[DEBUG] Sending prompt to Ollama:\n{prompt}\n")
-
-        payload = {"model": self.model, "prompt": prompt, "stream": False}
-
-        try:
-            resp = requests.post(f"{self.base_url}/api/generate", json=payload, timeout=300)
-            resp.raise_for_status()
-            text = resp.text.strip()
-            if DEBUG:
-                print(f"[DEBUG] Raw response from Ollama:\n{text}\n")
-
-            # Attempt to extract JSON
-            start = text.find("{")
-            end = text.rfind("}")
-            if start != -1 and end != -1:
-                json_text = text[start:end+1]
-                data = json.loads(json_text)
-                if DEBUG:
-                    print(f"[DEBUG] Parsed JSON:\n{data}\n")
-                return {
-                    "text": data.get("text", ""),
-                    "tool_call": data.get("tool_call", None)
-                }
-
-            # If no JSON, return raw text
-            return {"text": text, "tool_call": None}
-
-        except (requests.RequestException, json.JSONDecodeError) as e:
-            if DEBUG:
-                print(f"[DEBUG] Error during LLM call: {e}")
-            return {"text": f"[LLM ERROR] {e}", "tool_call": None}
+        # Text response
+        return {
+            "text": message.get("content", ""),
+            "tool_call": None
+        }

@@ -299,11 +299,10 @@ docker build -t py-coding-agent .
 
 ### 4. Run the agent
 
+docker compose run py-coding-agent
 ```
-docker run -it `
-  -v ${PWD}\workspace:/workspace `
-  -e OLLAMA_MODEL=lfm2.5-thinking:latest `
-  py-coding-agent
+ **Note:** Alternatively, run directly with Docker:
+ docker run -it -v ${PWD}\workspace:/workspace -v ${PWD}\dynamic_tools:/app/dynamic_tools py-coding-agent
 ```
 
 ---
@@ -313,7 +312,6 @@ docker run -it `
 ```
 > list files
 > list files recursively
-> read file py_mono/main.py
 > write file test.py with hello world code
 > run a shell command to list files
 > create a tool that appends safely to a file
@@ -341,8 +339,8 @@ docker run -it `
 * [x] Native Ollama tool calling
 * [x] Workspace sandboxing
 * [x] File listing tool (`list_files`)
-* [ ] Tool usage reliability improvements
-* [ ] Docstrings and polish
+* [x] Tool usage reliability improvements
+* [x] Docstrings and polish
 
 **Milestone 2 (Runtime + Infra)**
 
