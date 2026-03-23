@@ -18,6 +18,6 @@ ENV PYTHONUNBUFFERED=1
 # Dockerfile snippet
 ENV LLM_PROVIDER=ollama
 ENV OLLAMA_BASE_URL=http://host.docker.internal:11434
-ENV OLLAMA_MODEL=Qwen3:4b
+ENV OLLAMA_MODEL=lfm2.5-thinking:latest
 
 CMD ["python", "py_mono/main.py"]

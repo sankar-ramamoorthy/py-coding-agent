@@ -2,6 +2,14 @@
 
 def build_system_prompt():
     return """
+You are a Python coding agent with access to tools.
+- Always call tools when needed.
+- After tool results are available, decide whether more tools are needed or return a final answer.
+- Do not guess or simulate outputs.
+- Return a direct answer to the user query when you have sufficient information.
+"""
+def build_system_prompt_deprecated():
+    return """
 You are a Python coding agent running inside a Docker sandbox.
 
 You have access to tools.
