@@ -101,6 +101,7 @@ class Agent:
             self._log("LLM RESPONSE:", response)
 
             tool_call = response.get("tool_call")
+            
             text = response.get("text")
 
             # -------------------------
@@ -109,7 +110,7 @@ class Agent:
             if tool_call:
                 self.tool_call_count += 1
                 tool_name = tool_call.get("name")
-                args = tool_call.get("args", {})
+                args = tool_call.get("args") or {}  # ✅ guard against None
 
                 # Generate unique tool_call_id for canonical format (ADR-005)
                 tool_call_id = str(uuid.uuid4())
@@ -142,7 +143,7 @@ class Agent:
                             "type": "function",
                             "function": {
                                 "name": tool_name,
-                                "arguments": args
+                                "arguments": json.dumps(args or {})  # ✅ always a valid JSON string
                             }
                         }
                     ]

@@ -1,4 +1,3 @@
-````
 # Py-Coding-Agent Design Document
 
 ## Goal
@@ -8,17 +7,15 @@ Build a local Python coding agent inspired by **pi-mono** that can:
 - Execute tasks safely in a **sandbox** (`/workspace`)
 - Dynamically create, load, and run Python tools
 - Install Python packages as needed
-- Interface with a local LLM (Ollama)
+- Interface with local or cloud LLMs via a provider abstraction layer
 
 ---
 
 ## Architecture Overview
 
-The agent uses a **minimal loop**, letting the LLM decide whether to call a tool or return a final answer. Tools can be **built-in** or **dynamically created** at runtime.
+The agent uses a **minimal loop**, letting the LLM decide whether to call a tool or return a final answer. Tools can be **built-in** or **dynamically created** at runtime. The LLM provider is abstracted so the agent works with Ollama locally or any cloud provider via LiteLLM.
 
 ```
-ASCII Diagram of Agent Loop (pi-mono style)
-
 User (CLI)
    │
    ▼
@@ -48,18 +45,15 @@ Agent Loop
    │            │
    └────────────▼
 Final Answer → User
-````
+```
 
 **Dynamic Tool Lifecycle:**
 
 ```
-LLM calls `create_tool`
+LLM calls create_tool
    │
    ▼
-build_create_tool_prompt(user_request) → generates Python code
-   │
-   ▼
-Agent executes `create_tool(code)` → writes to dynamic_tools/
+Agent executes create_tool(code) → writes to dynamic_tools/
    │
    ▼
 Agent reloads tools via load_dynamic_tools()
@@ -74,14 +68,36 @@ Dynamic tool available immediately for use
 
 * **Docker container** (isolated)
 * **Workspace directory (`/workspace`)**
-
   * All file operations go through `resolve_safe_path()`
   * Prevents access outside sandbox
 * **Dynamic tools folder (`dynamic_tools/`)**
-
-  * Runtime-generated Python tools
+  * Volume mounted — no rebuild required for new tools
 * **Python packages** installed via `uv`
-* **LLM** interface via Ollama (local)
+* **LLM** via Ollama (local default) or LiteLLM (cloud providers)
+
+---
+
+## LLM Provider Abstraction (ADR-005)
+
+The agent maintains a **canonical OpenAI-style message format** internally.
+Each provider translates to/from its own wire format in its own class.
+The agent never knows what provider it is talking to.
+
+```
+agent.py  →  canonical memory format
+                    │
+                    ▼
+         OllamaProvider    → translates to Ollama wire format
+         LiteLLMProvider   → pass-through (OpenAI native)
+                                   │
+                                   ├── groq/qwen/qwen3-32b
+                                   ├── openai/gpt-4o
+                                   └── anthropic/claude-3-5-haiku
+```
+
+Provider selected via `LLM_PROVIDER` environment variable:
+- `ollama` — default, direct HTTP, no extra dependencies
+- `litellm` — cloud providers, requires `LITELLM_MODEL` and API key
 
 ---
 
@@ -89,13 +105,13 @@ Dynamic tool available immediately for use
 
 * Agent appends user input to memory
 * LLM decides on each step:
-
   * Call a tool (with arguments)
   * Return final answer
 * Agent executes tool, records result in memory
 * Result fed back to LLM for next iteration
 * Loop continues until LLM outputs final answer
-* Loop has **simple repeat-detection guard** to prevent infinite tool calls
+* Loop has **repeat-detection guard** to prevent infinite tool calls
+* Memory **auto-pruned** every N tool calls (default: 5), keeping last 20 messages
 
 ---
 
@@ -106,7 +122,7 @@ Dynamic tool available immediately for use
 * `list_files` — List files and directories (supports recursion)
 * `read_file` — Read file contents
 * `write_file` — Write content to files
-* `edit_file` — Modify files with instructions
+* `edit_file` — Find-and-replace editing (read file first for exact content)
 * `shell` — Execute shell commands (restricted to `/workspace`)
 * `install_dependency` — Install Python packages via `uv`
 * `create_tool` — Dynamically create new Python tools
@@ -115,35 +131,36 @@ Dynamic tool available immediately for use
 
 * Created at runtime via `create_tool`
 * Must follow sandbox rules (`resolve_safe_path`)
+* Discovered via `isinstance(attr, Tool)` scan — no hardcoded attribute name
 * Immediately available after `load_dynamic_tools()`
-* Can define own parameters via `Tool` metadata
+* Volume mounted — persist across container restarts
 
 ---
 
----
-
-
-```markdown
 ## Memory & Session Management
 
 The agent maintains a **conversation memory**:
 
-1. **System prompt** – immutable
+1. **System prompt** — immutable, always preserved
 2. **User messages**
-3. **Assistant/tool calls**
+3. **Assistant tool calls** (canonical format)
+4. **Tool results**
+5. **Assistant text responses**
 
 **Special Commands**
 
-- `/clear` → resets conversation memory
+- `/clear` → resets conversation memory to system prompt only, resets all loop guards
 - `/bye` → terminates session
 
 **Auto-Pruning**
 
 - Prunes memory automatically after `auto_prune_after` tool calls (default 5)
 - Keeps last `prune_keep_last` messages (default 20)
-- Ensures memory does not grow unbounded
+- System prompt always preserved
 
-## V1 Scope
+---
+
+## V1 Scope (Milestone 1 ✅)
 
 * CLI-driven agent
 * Base toolset with safe file + shell operations
@@ -151,21 +168,29 @@ The agent maintains a **conversation memory**:
 * Dynamic tool creation and runtime loading
 * Workspace sandbox enforcement
 * LLM integration via Ollama
-* MCP Server docs\adr\ADR-004-MCP-Server.md
 
----
+## V2 Scope (Milestone 2 🔄)
 
-## V2 Ideas
+* Multi-provider LLM support via LiteLLM (ADR-005)
+* Docker Compose with volume mounts
+* Config-driven environment
+* MCP Server (ADR-004)
+
+## V3 Ideas (Milestone 3)
+
+* Provider registry pattern (ADR-006)
+* Runtime provider switching (`/provider groq`)
+* Encrypted API key management via KeyManager
+* Session manager with per-session provider state
+* Smart provider routing by task type
+
+## V4 Ideas
 
 * Multi-agent pods: planner, coder, tester
 * Tool schema validation and registry
 * Memory indexing for tools
 * Automatic tool testing
-* Enhanced LLM prompts for tool creation
-* More intelligent loop safety and retry logic
-
 * Offload older memory to disk/DB
-* Allow configurable pruning policies
 
 ---
 
@@ -174,8 +199,5 @@ The agent maintains a **conversation memory**:
 * **Safety First** — All operations restricted to `/workspace`
 * **Minimal Loop** — LLM controls flow, agent just orchestrates
 * **Dynamic Extensibility** — New tools can be created and loaded at runtime
+* **Provider Agnostic** — Agent never knows what LLM it is talking to
 * **Transparency** — Tool results fed back to LLM, agent logs each step
-
-```
-
----
