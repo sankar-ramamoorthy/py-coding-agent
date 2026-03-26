@@ -3,7 +3,6 @@
 from py_mono.llm.prompts import build_system_prompt
 import json
 import uuid
-from typing import Any, Dict, List, Optional
 
 
 class Agent:
@@ -20,15 +19,7 @@ class Agent:
     - Support memory clearing, pruning, auto-pruning, session termination
     """
 
-    def __init__(
-        self,
-        llm: Any,
-        tools: List[Any],
-        max_steps: int = 10,
-        debug: bool = True,
-        auto_prune_after: int = 5,
-        prune_keep_last: int = 20,
-    ):
+    def __init__(self, llm, tools, max_steps=10, debug=True, auto_prune_after=5, prune_keep_last=20):
         self.llm = llm
         self.tools = {t.name: t for t in tools}
         self.max_steps = max_steps
@@ -37,23 +28,21 @@ class Agent:
         self.prune_keep_last = prune_keep_last
 
         # Initialize memory with system prompt only
-        self.memory = [
-            {
-                "role": "system",
-                "content": build_system_prompt(),
-            }
-        ]
+        self.memory = [{
+            "role": "system",
+            "content": build_system_prompt()
+        }]
 
         # Loop guards
-        self.last_tool_call: Optional[tuple] = None
+        self.last_tool_call = None
         self.repeat_count = 0
         self.tool_call_count = 0
 
-    def _log(self, *args: Any) -> None:
+    def _log(self, *args):
         if self.debug:
             print(*args)
 
-    def _print_memory(self) -> None:
+    def _print_memory(self):
         if self.debug:
             print("\n===== MEMORY =====")
             print(json.dumps(self.memory, indent=2))
@@ -62,28 +51,19 @@ class Agent:
     # -------------------------
     # Memory / Session Methods
     # -------------------------
-
-    def clear_memory(self) -> str:
-        """
-        Clear all conversation history except the core system prompt.
-        Reset all loop guards.
-        """
-        self.memory = [
-            {
-                "role": "system",
-                "content": build_system_prompt(),
-            }
-        ]
+    def clear_memory(self):
+        """Clear all conversation history except the core system prompt. Reset all loop guards."""
+        self.memory = [{
+            "role": "system",
+            "content": build_system_prompt()
+        }]
         self.last_tool_call = None
         self.repeat_count = 0
         self.tool_call_count = 0
         self._log("🗑️ Memory fully cleared. Ready for a fresh session.")
-        return "✅ Memory cleared. You can start fresh."
 
-    def prune_memory(self) -> None:
-        """
-        Compact memory by keeping only the last N messages (excluding system prompt).
-        """
+    def prune_memory(self):
+        """Compact memory by keeping only the last N messages (excluding system prompt)."""
         system_msgs = [msg for msg in self.memory if msg["role"] == "system"]
         other_msgs = [msg for msg in self.memory if msg["role"] != "system"]
         self.memory = system_msgs + other_msgs[-self.prune_keep_last:]
@@ -92,25 +72,22 @@ class Agent:
     # -------------------------
     # Main agent loop
     # -------------------------
+    def run(self, user_input: str):
+        """Run the agent for a single user query."""
 
-    def run(self, user_input: str) -> str:
-        """
-        Run the agent for a single user query.
-        """
         # Handle session commands
         user_cmd = user_input.strip().lower()
         if user_cmd == "/clear":
-            return self.clear_memory()
+            self.clear_memory()
+            return "✅ Memory cleared. You can start fresh."
         if user_cmd == "/bye":
             return "👋 Goodbye! Session ended."
 
         # Add user message
-        self.memory.append(
-            {
-                "role": "user",
-                "content": user_input,
-            }
-        )
+        self.memory.append({
+            "role": "user",
+            "content": user_input
+        })
 
         for step in range(self.max_steps):
             self._log(f"\n--- STEP {step} ---")
@@ -118,11 +95,13 @@ class Agent:
 
             response = self.llm.generate(
                 messages=self.memory,
-                tools=list(self.tools.values()),
+                tools=list(self.tools.values())
             )
+
             self._log("LLM RESPONSE:", response)
 
             tool_call = response.get("tool_call")
+            
             text = response.get("text")
 
             # -------------------------
@@ -131,7 +110,7 @@ class Agent:
             if tool_call:
                 self.tool_call_count += 1
                 tool_name = tool_call.get("name")
-                args = tool_call.get("args") or {}  # guard against None
+                args = tool_call.get("args") or {}  # ✅ guard against None
 
                 # Generate unique tool_call_id for canonical format (ADR-005)
                 tool_call_id = str(uuid.uuid4())
@@ -148,32 +127,28 @@ class Agent:
                 if self.repeat_count >= 1:
                     self._log("⚠️ Repeated tool call detected, nudging LLM")
                     # Use role "user" not "system" to avoid polluting the system prompt slot
-                    self.memory.append(
-                        {
-                            "role": "user",
-                            "content": "[AGENT] You already called this tool with the same arguments. Use the result to answer the user.",
-                        }
-                    )
+                    self.memory.append({
+                        "role": "user",
+                        "content": "[AGENT] You already called this tool with the same arguments. Use the result to answer the user."
+                    })
                     continue
 
                 # Record assistant tool call in canonical OpenAI-style format (ADR-005)
-                # Note: "arguments" is a dict, not a JSON string.
-                self.memory.append(
-                    {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [
-                            {
-                                "id": tool_call_id,
-                                "type": "function",
-                                "function": {
-                                    "name": tool_name,
-                                    "arguments": args or {},  # dict, not json.dumps
-                                },
+                self.memory.append({
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": tool_call_id,
+                            "type": "function",
+                            "function": {
+                                "name": tool_name,
+                                #"arguments": json.dumps(args or {})  # ✅ always a valid JSON string
+                                "arguments": args or {}
                             }
-                        ],
-                    }
-                )
+                        }
+                    ]
+                })
 
                 # Execute the tool
                 tool = self.tools.get(tool_name)
@@ -188,13 +163,11 @@ class Agent:
                 self._log(f"TOOL [{tool_name}] RESULT:", result)
 
                 # Record tool result in canonical format (ADR-005)
-                self.memory.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        "content": str(result),
-                    }
-                )
+                self.memory.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": str(result)
+                })
 
                 # Auto-prune memory if needed
                 if self.tool_call_count % self.auto_prune_after == 0:
@@ -206,14 +179,12 @@ class Agent:
             # Final answer
             # -------------------------
             if text:
-                self.memory.append(
-                    {
-                        "role": "assistant",
-                        "content": text,
-                    }
-                )
+                self.memory.append({
+                    "role": "assistant",
+                    "content": text
+                })
                 self._log("\n✅ FINAL ANSWER:")
-                #self._log(text)
+                self._log(text)
                 return text
 
             # -------------------------

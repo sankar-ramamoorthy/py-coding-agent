@@ -27,6 +27,7 @@ from py_mono.tools.tool_loader import load_dynamic_tools
 from py_mono.ui.cli import start_cli
 
 
+
 def init_provider():
     """
     Initialize the LLM provider based on LLM_PROVIDER environment variable.
@@ -63,11 +64,14 @@ def load_mcp_tools() -> list:
         list: List of Tool instances backed by MCP servers
     """
     try:
-        from py_mono.mcp.mcp_tool import datetime_mcp_tool
+        #from py_mono.mcp.mcp_tool import datetime_mcp_tool
+        from py_mono.mcp_integration.mcp_tool import datetime_mcp_tool
         tools = [datetime_mcp_tool]
         print(f"🔌 Loaded {len(tools)} MCP tool(s): {[t.name for t in tools]}")
         return tools
     except Exception as e:
+        import traceback
+        traceback.print_exc()  # ← add this
         print(f"⚠️  MCP tools unavailable: {e}")
         return []
 

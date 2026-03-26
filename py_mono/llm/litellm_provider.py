@@ -21,6 +21,7 @@ See ADR-005 for canonical message format specification.
 import os
 from py_mono.llm.base import LLMProvider
 from py_mono.llm.tool_schema import build_tool_schemas
+from typing import Any, Dict, List, Union
 
 try:
     import litellm
@@ -41,7 +42,52 @@ class LiteLLMProvider(LLMProvider):
     def __init__(self, model: str = None):
         self.model = model or os.getenv("LITELLM_MODEL", "groq/llama-3.3-70b-versatile")
 
-    def to_wire_messages(self, messages: list) -> list:
+
+    def to_wire_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        LiteLLM speaks OpenAI natively, but Groq wants arguments as JSON strings.
+        Translate canonical tool_calls so that "arguments" is JSON‑encoded.
+        """
+        import json
+
+        wire = []
+        for msg in messages:
+            role = msg.get("role")
+
+            if role == "assistant" and msg.get("tool_calls"):
+                transformed = {
+                    "role": "assistant",
+                    "content": msg.get("content"),
+                    "tool_calls": [],
+                }
+                for tc in msg["tool_calls"]:
+                    func = tc["function"]
+                    args = func["arguments"]
+                    # If it's a dict, serialize it; otherwise leave it
+                    if isinstance(args, dict):
+                        args = json.dumps(args, separators=(",", ":"))
+                    transformed["tool_calls"].append({
+                        "id": tc.get("id"),
+                        "type": tc.get("type", "function"),
+                        "function": {
+                            "name": func["name"],
+                            "arguments": args,
+                        },
+                    })
+                wire.append(transformed)
+
+            elif role == "tool":
+                # Pass tool result through as-is
+                wire.append(msg)
+
+            else:
+                # system, user, assistant text
+                wire.append(msg)
+
+        return wire
+
+
+    def to_wire_messages1(self, messages: list) -> list:
         """
         LiteLLM speaks OpenAI natively so canonical format passes through as-is.
 

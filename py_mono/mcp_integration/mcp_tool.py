@@ -15,7 +15,8 @@ import asyncio
 import logging
 import os
 from py_mono.tools.tool import Tool
-from py_mono.mcp.mcp_client import call_mcp_tool
+#from py_mono.mcp.mcp_client import call_mcp_tool
+from py_mono.mcp_integration.mcp_client import call_mcp_tool
 
 logger = logging.getLogger(__name__)
 

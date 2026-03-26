@@ -9,8 +9,9 @@ dependencies = [
     "requests",
     "pandas",
     "rich",
-    "litellm",
-    "fastmcp"
+    "litellm==1.82.6",
+    "fastmcp==3.1.1",
+    "mcp>=1.25.0"
 ]
 
 [build-system]
