@@ -93,7 +93,10 @@ class OllamaProvider(LLMProvider):
             json=payload,
             timeout=300
         )
-        resp.raise_for_status()
+        if not resp.ok:
+            # Log raw error from Ollama
+            print(f"[DEBUG] Ollama HTTP {resp.status_code}: {resp.text}")
+            resp.raise_for_status()
         data = resp.json()
 
         if DEBUG:
