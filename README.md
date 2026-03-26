@@ -18,6 +18,7 @@ Inspired by autonomous agent systems like pi-mono, this project explores **tool-
 * File + shell interaction tools
 * **Multi-provider LLM support via LiteLLM** (Groq, OpenAI, Anthropic, and more)
 * Local Ollama support (default, zero extra dependencies)
+* **MCP Server integration via FastMCP + HTTP**
 
 ---
 
@@ -45,6 +46,10 @@ All agent actions are restricted to:
 * `install_dependency` — Install Python packages via `uv`
 * `create_tool` — Dynamically create new Python tools
 
+### MCP Tools
+
+* `get_current_datetime` — Get current UTC datetime from datetime MCP server
+
 ---
 
 ### LLM Providers
@@ -58,6 +63,17 @@ All agent actions are restricted to:
 
 ---
 
+### MCP Servers
+
+| MCP Server | Port | Tool | Status |
+|---|---|---|---|
+| `datetime-mcp` | 50051 | `get_current_datetime` | ✅ Live |
+
+MCP servers run as separate Docker containers on a shared network.
+The agent communicates with them via `http://datetime-mcp:50051/mcp`.
+
+---
+
 ### Pi-Mono Minimal Loop
 
 The agent follows a **minimal reasoning loop** inspired by pi-mono:
@@ -68,7 +84,7 @@ The agent follows a **minimal reasoning loop** inspired by pi-mono:
 3. LLM reads memory → decides:
       a) Final answer → return to user
       b) Tool call → specify tool + args
-4. Agent executes tool (sandboxed)
+4. Agent executes tool (sandboxed or via MCP server)
 5. Tool result appended to memory
 6. LLM reads updated memory → next tool call or final answer
 7. Repeat until LLM returns final answer or max steps reached
@@ -108,19 +124,23 @@ Special commands supported by the agent:
 
 ```
 py_mono/
-├── agent/        # Core agent loop
-├── llm/          # Ollama + LiteLLM providers, tool schemas
-├── tools/        # Built-in and dynamic tools
-├── utils/        # Path safety + helpers
-├── ui/           # CLI interface
-├── config.py     # Environment configuration
-└── main.py       # Entry point
+├── agent/            # Core agent loop
+├── llm/              # Ollama + LiteLLM providers, tool schemas
+├── mcp_integration/  # MCP client and tool wrappers
+├── tools/            # Built-in and dynamic tools
+├── utils/            # Path safety + helpers
+├── ui/               # CLI interface
+├── config.py         # Environment configuration
+└── main.py           # Entry point
 
-dynamic_tools/    # Runtime-generated tools (volume mounted)
-workspace/        # Mounted safe working directory
+mcp_servers/          # MCP microservices
+└── datetime/         # Datetime MCP server (FastMCP + HTTP)
+
+dynamic_tools/        # Runtime-generated tools (volume mounted)
+workspace/            # Mounted safe working directory
 docs/
-├── adr/          # Architectural Decision Records
-└── *.md          # Design and architecture docs
+├── adr/              # Architectural Decision Records
+└── *.md              # Design and architecture docs
 ```
 
 ---
@@ -163,12 +183,15 @@ docker compose build
 docker compose run py-coding-agent
 ```
 
+Both the agent and datetime MCP server start automatically via Docker Compose.
+
 ---
 
 ### Example Usage
 
 ```
 > list files
+> what is the current date and time
 > read file plan.md
 > write a hello world python script to hello.py
 > run hello.py
@@ -185,7 +208,6 @@ docker compose run py-coding-agent
 
 * No persistent memory across sessions
 * No tool validation or retry logic
-* Output prints twice in CLI (known issue, backlog)
 * LLM may answer from stale memory instead of re-reading files after edits
 
 ---
@@ -203,13 +225,13 @@ docker compose run py-coding-agent
 * [x] Tool usage reliability improvements
 * [x] Docstrings and polish
 
-**Milestone 2 (Runtime + Infra) 🔄**
+**Milestone 2 (Runtime + Infra) ✅**
 
 * [x] Multi-provider LLM support via LiteLLM (ADR-005)
 * [x] Docker Compose with volume mounts
 * [x] Config-driven environment
 * [x] MVP demo — end-to-end script generation
-* [ ] MCP Server (ADR-004)
+* [x] MCP Server integration via FastMCP + HTTP (ADR-004)
 
 **Milestone 3 (Provider Registry + Session Management)**
 
@@ -234,6 +256,7 @@ docker compose run py-coding-agent
 * Automated tool testing
 * Smarter task decomposition
 * Smart provider routing by task type
+* Additional MCP servers (weather, search, geocoding)
 
 ---
 
@@ -244,6 +267,7 @@ docker compose run py-coding-agent
 * Local-first AI workflows
 * Safe execution via containerization
 * Provider-agnostic LLM abstraction
+* MCP microservices for specialized tool execution
 
 ---
 
