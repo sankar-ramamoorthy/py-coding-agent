@@ -1,7 +1,7 @@
 # ADR-004: MCP Server Integration for Py-Coding-Agent
 
-**Status:** Accepted (revised)
-**Date:** 2026-03-23
+**Status:** Implemented
+**Date:** 2026-03-25
 **Milestone:** 2
 
 ---

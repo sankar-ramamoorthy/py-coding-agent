@@ -90,7 +90,23 @@ LLMProvider (base.py)
               ├── anthropic/claude-3-5-haiku
               └── ... any litellm provider
 ```
+## MCP Integration (ADR-004)
 
+agent (sync)
+  │
+  └── mcp_integration/mcp_tool.py
+        │ asyncio.run() bridge
+        ▼
+  mcp_integration/mcp_client.py
+        │ async fastmcp.Client
+        ▼
+  http://datetime-mcp:50051/mcp
+        │
+        ▼
+  mcp_servers/datetime (FastMCP container)
+        │
+        ▼
+  get_current_datetime_tool() → UTC ISO string
 ---
 
 ## Canonical Message Format (ADR-005)
