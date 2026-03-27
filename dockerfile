@@ -20,7 +20,7 @@ COPY . /app
 
 # Install the project in-place (if you want an editable install)
 # If you moved helpers into pyproject.toml, you can drop this.
-#RUN uv pip install --system -e .
+RUN uv pip install --system -e .
 
 # Dynamic‑tools dir
 RUN mkdir -p /app/dynamic_tools
@@ -31,4 +31,5 @@ ENV PYTHONUNBUFFERED=1 \
     OLLAMA_BASE_URL=http://host.docker.internal:11434 \
     OLLAMA_MODEL=lfm2.5-thinking:latest
 
-CMD ["python", "py_mono/main.py"]
+#CMD ["python", "py_mono/main.py"]
+CMD ["python", "-m", "py_mono.main"]

@@ -15,6 +15,8 @@ COPY . /app
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "datetime_mcp/server.py"]
+#CMD ["python", "datetime_mcp/server.py"]
+CMD ["uv", "run", "python", "datetime_mcp/server.py"]
+
 # rely on uv.lock + uv sync for reproducibility, no uv pip install 
 # ... unless you need an editable install.
