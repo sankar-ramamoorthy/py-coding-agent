@@ -179,6 +179,23 @@ ollama pull lfm2.5-thinking:latest
 #### 4. Build and run
 
 ```
+#### 4. Build and run
+
+First, ensure `uv` is installed on the host, then generate or update the lockfile:
+
+```bash
+# In project root (agent)
+uv lock
+
+# In mcp_servers/datetime
+cd mcp_servers/datetime
+uv lock
+
+````
+Back in the project root, build and run the containers:
+
+```bash
+cd ../../  # back to project root
 docker compose build
 docker compose run py-coding-agent
 ```
@@ -239,6 +256,7 @@ Both the agent and datetime MCP server start automatically via Docker Compose.
 * [ ] Runtime provider switching (`/provider groq`)
 * [ ] Encrypted API key management
 * [ ] Session manager
+* [ ] **Dependency locking strategy (ADR-007)** — hybrid `uv lock` workflow on host vs Docker
 
 **Milestone 4 (Polish)**
 
