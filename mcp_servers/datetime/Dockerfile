@@ -4,10 +4,19 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 WORKDIR /app
 
-COPY . .
+# Copy lockfile and manifest
+COPY uv.lock pyproject.toml ./
 
-RUN uv pip install --system -e .
+# Install dependencies from lockfile
+RUN uv sync --no-dev --no-editable
+
+# Copy the app
+COPY . /app
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "datetime_mcp/server.py"]
+#CMD ["python", "datetime_mcp/server.py"]
+CMD ["uv", "run", "python", "datetime_mcp/server.py"]
+
+# rely on uv.lock + uv sync for reproducibility, no uv pip install 
+# ... unless you need an editable install.
