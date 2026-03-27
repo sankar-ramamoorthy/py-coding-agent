@@ -4,6 +4,7 @@ import os
 import requests
 from py_mono.llm.base import LLMProvider
 from py_mono.llm.tool_schema import build_tool_schemas
+from typing import Optional
 
 DEBUG = True  # Set to False to silence debug logs
 
@@ -16,10 +17,13 @@ class OllamaProvider(LLMProvider):
     before sending, and normalizes Ollama responses back to the canonical dict.
     """
 
-    def __init__(self, model=None):
-        self.model = model or os.getenv("OLLAMA_MODEL", "lfm2.5-thinking:latest")
+    def __init__(self, model_name: Optional[str] = None):
+        super().__init__(model_name=model_name)
         self.base_url = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-
+        # Use CLI‑provided model first, env as fallback
+        self.model_name = model_name or os.getenv(
+            "OLLAMA_MODEL", "lfm2.5-thinking:latest"
+        )
     def to_wire_messages(self, messages: list) -> list:
         """
         Translate canonical OpenAI-style messages to Ollama wire format.
@@ -77,7 +81,7 @@ class OllamaProvider(LLMProvider):
         wire_messages = self.to_wire_messages(messages)
 
         payload = {
-            "model": self.model,
+            "model": self.model_name,
             "messages": wire_messages,
             "stream": False
         }

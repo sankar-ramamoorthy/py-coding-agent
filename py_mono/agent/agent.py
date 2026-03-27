@@ -4,7 +4,9 @@ from py_mono.llm.prompts import build_system_prompt
 import json
 import uuid
 from typing import Any, Dict, List, Optional
-
+from py_mono.session.session_manager import SessionManager
+from py_mono.llm.provider_registry import REGISTRY, get_provider
+#from py_mono.utils.special_commands import is_special_command,handle_special_command
 
 class Agent:
     """
@@ -22,14 +24,14 @@ class Agent:
 
     def __init__(
         self,
-        llm: Any,
+        session_manager: SessionManager,
         tools: List[Any],
         max_steps: int = 10,
         debug: bool = True,
         auto_prune_after: int = 5,
         prune_keep_last: int = 20,
     ):
-        self.llm = llm
+        self.session_manager = session_manager
         self.tools = {t.name: t for t in tools}
         self.max_steps = max_steps
         self.debug = debug
@@ -58,6 +60,71 @@ class Agent:
             print("\n===== MEMORY =====")
             print(json.dumps(self.memory, indent=2))
             print("==================\n")
+
+
+    def _is_special_command(self, text: str) -> bool:
+        text = text.strip()
+        if text == "/clear":
+            return True
+        if text == "/bye":
+            return True
+        if text == "/providers":
+            return True
+        if text.startswith("/provider "):
+            return True
+        return False
+
+
+
+    def _handle_special_command(self, text: str) -> str:
+        text = text.strip()
+
+        if text == "/clear":
+            self.clear_memory()
+            return "Cleared conversation history (system prompt preserved)."
+
+        if text == "/bye":
+            return "Bye!"
+
+        if text == "/providers":
+            active = self.session_manager.get_active_provider()
+            available = ", ".join(sorted(REGISTRY.keys()))
+            model = getattr(active, "model_name", "<unknown>")
+            return (
+                f"Active provider: {active.__class__.__name__}\n"
+                f"Active model: {model}\n"
+                f"Available providers: {available}"
+            )
+
+        if text.startswith("/provider "):
+            parts = text.split(maxsplit=2)  # /provider ollama granite4:350m
+            if len(parts) < 2:
+                return "Usage: /provider <provider> [model]"
+
+            provider_key = parts[1]
+            model_hint = parts[2] if len(parts) == 3 else None
+
+            if provider_key not in REGISTRY:
+                available_names = ", ".join(sorted(REGISTRY.keys()))
+                return f"Unknown provider '{provider_key}'. Available providers: {available_names}"
+
+            try:
+                self.session_manager.switch_provider(provider_key, model=model_hint)
+                current = self.session_manager.get_active_provider()
+                model = getattr(current, "model_name", "<unknown>")
+                if model_hint:
+                    return (
+                        f"Switched provider to {current.__class__.__name__} ({provider_key}) "
+                        f"using model '{model_hint}'.\n"
+                        f"Underlying model: {model}"
+                    )
+                return f"Switched provider to {current.__class__.__name__} ({provider_key})."
+            except Exception as e:
+                return f"Could not switch provider: {e}"
+
+        return ""
+
+
 
     # -------------------------
     # Memory / Session Methods
@@ -98,11 +165,17 @@ class Agent:
         Run the agent for a single user query.
         """
         # Handle session commands
-        user_cmd = user_input.strip().lower()
-        if user_cmd == "/clear":
-            return self.clear_memory()
-        if user_cmd == "/bye":
-            return "👋 Goodbye! Session ended."
+        # Handle special commands BEFORE appending to memory
+        user_input_stripped = user_input.strip()  
+        if self._is_special_command(user_input_stripped):
+            reply = self._handle_special_command(user_input_stripped)
+            if user_input == "/bye":
+                return reply
+            self.memory.append(
+                {"role": "assistant", "content": reply}
+            )
+            return reply
+                    
 
         # Add user message
         self.memory.append(
@@ -116,10 +189,13 @@ class Agent:
             self._log(f"\n--- STEP {step} ---")
             self._print_memory()
 
-            response = self.llm.generate(
+            llm = self.session_manager.get_active_provider()
+
+            response = llm.generate(
                 messages=self.memory,
                 tools=list(self.tools.values()),
             )
+
             self._log("LLM RESPONSE:", response)
 
             tool_call = response.get("tool_call")
@@ -223,3 +299,5 @@ class Agent:
             break
 
         return "[ERROR] Agent reached max steps"
+
+

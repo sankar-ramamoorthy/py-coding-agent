@@ -21,7 +21,7 @@ See ADR-005 for canonical message format specification.
 import os
 from py_mono.llm.base import LLMProvider
 from py_mono.llm.tool_schema import build_tool_schemas
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Optional
 
 try:
     import litellm
@@ -39,8 +39,10 @@ class LiteLLMProvider(LLMProvider):
     through a single OpenAI-compatible interface.
     """
 
-    def __init__(self, model: str = None):
-        self.model = model or os.getenv("LITELLM_MODEL", "groq/llama-3.3-70b-versatile")
+    def __init__(self, model_name: Optional[str] = None):
+        super().__init__(model_name=model_name)
+        # Use CLI‑provided model as primary; env as fallback
+        self.model_name = model_name or os.getenv("LITELLM_MODEL", "groq/llama-3.3-70b-versatile")
 
 
     def to_wire_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -103,7 +105,7 @@ class LiteLLMProvider(LLMProvider):
         try:
             wire_messages = self.to_wire_messages(messages)
             kwargs = {
-                "model": self.model,
+                "model": self.model_name,
                 "messages": wire_messages,
             }
             if tools:
