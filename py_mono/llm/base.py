@@ -1,19 +1,15 @@
 # py_mono/llm/base.py
-"""
-Abstract base class for LLM providers.
-
-All providers must implement:
-- generate(): send messages to the LLM and return a normalized response
-- to_wire_messages(): translate canonical OpenAI-style memory to provider wire format
-
-See ADR-005 for the canonical message format specification.
-"""
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 
 class LLMProvider(ABC):
     """Base class for all LLM providers."""
+
+    def __init__(self, model_name: Optional[str] = None):
+        self.model_name = model_name
+        # providers can override or interpret this as needed
 
     @abstractmethod
     def generate(self, messages: list, tools: list = None) -> dict:

@@ -16,6 +16,7 @@ Environment Variables:
 
 from py_mono.config import LLM_PROVIDER
 from py_mono.agent.agent import Agent
+from py_mono.session.session_manager import SessionManager
 from py_mono.tools.read_file import read_tool
 from py_mono.tools.write_file import write_tool
 from py_mono.tools.edit_file import edit_tool
@@ -28,29 +29,8 @@ from py_mono.ui.cli import start_cli
 
 
 
-def init_provider():
-    """
-    Initialize the LLM provider based on LLM_PROVIDER environment variable.
-
-    Returns:
-        LLMProvider: Configured provider instance ready for use
-
-    Raises:
-        ValueError: If LLM_PROVIDER is set to an unsupported value
-    """
-    if LLM_PROVIDER == "litellm":
-        print(f"🤖 Using LiteLLM provider")
-        from py_mono.llm.litellm_provider import LiteLLMProvider
-        return LiteLLMProvider()
-    elif LLM_PROVIDER == "ollama":
-        print(f"🤖 Using Ollama provider")
-        from py_mono.llm.ollama_provider import OllamaProvider
-        return OllamaProvider()
-    else:
-        raise ValueError(
-            f"Unsupported LLM_PROVIDER: '{LLM_PROVIDER}'. "
-            "Supported values: 'ollama', 'litellm'"
-        )
+#deleted init_provider() entirely; 
+# it’s now replaced by REGISTRY + SessionManager
 
 
 def load_mcp_tools() -> list:
@@ -102,11 +82,12 @@ def main():
     # Combine all tools
     tools = base_tools + dynamic_tools + mcp_tools
 
-    # Initialize provider
-    llm = init_provider()
+    # Initialize session manager with default provider from env
+    session_manager = SessionManager(default_provider=LLM_PROVIDER)
 
     # Create the agent
-    agent = Agent(llm, tools)
+    agent = Agent(session_manager, tools)
+
 
     # Start the CLI
     start_cli(agent)

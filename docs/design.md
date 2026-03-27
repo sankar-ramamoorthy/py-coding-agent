@@ -162,27 +162,32 @@ The agent maintains a **conversation memory**:
 
 ## V1 Scope (Milestone 1 ✅)
 
-* CLI-driven agent
+* CLI‑driven agent
 * Base toolset with safe file + shell operations
-* Minimal agent loop (pi-mono style)
+* Minimal agent loop (pi‑mono style)
 * Dynamic tool creation and runtime loading
 * Workspace sandbox enforcement
 * LLM integration via Ollama
 
-## V2 Scope (Milestone 2 🔄)
+## V2 Scope (Milestone 2 ✅)
 
-* Multi-provider LLM support via LiteLLM (ADR-005)
+* Multi‑provider LLM support via LiteLLM (ADR‑005)
 * Docker Compose with volume mounts
-* Config-driven environment
-* MCP Server (ADR-004)
+* Config‑driven environment
+* MCP Server (ADR‑004)
 
-## V3 Ideas (Milestone 3)
+## V3 Implemented (Milestone 3)
 
-* Provider registry pattern (ADR-006)
-* Runtime provider switching (`/provider groq`)
+* Provider registry pattern (ADR‑006)
+* Session manager with per‑session provider state
+* Runtime provider switching (e.g. `/provider ollama`, `/provider litellm`)
+* Tight‑binding model selection in provider instances (ADR‑009)
+* **Dependency locking strategy (ADR‑007)** — hybrid `uv lock` workflow on host vs Docker
+
+## V3 Planned / In‑progress
+
 * Encrypted API key management via KeyManager
-* Session manager with per-session provider state
-* Smart provider routing by task type
+* Smart provider routing by task type (ADR‑008) — e.g., `ollama` for local/private, `groq` for fast tools, `anthropic` for complex reasoning
 
 ## V4 Ideas
 
