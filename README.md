@@ -1,8 +1,4 @@
-
-***
-
 ## README.md
-```markdown
 # py-coding-agent
 
 A Dockerized Python coding agent that uses an LLM to reason, call tools, and execute tasks inside a **sandboxed workspace**.
@@ -124,6 +120,7 @@ User → Agent → LLM → create_tool → Tool file saved in dynamic_tools/
 
 ### Session & Memory Management
 
+
 Special commands supported by the agent:
 
 - `/clear` → Clears conversation memory (except system prompt), resets loop guards  
@@ -132,6 +129,18 @@ Special commands supported by the agent:
 - `/provider <name>` → Switches active LLM provider for the remainder of the session  
 - `/provider <name> <model>` → Switches provider and **binds a model** for this session  
   - Example: `/provider ollama granite4:350m`, `/provider litellm groq/qwen/qwen3-32b`  
+
+**Key management (ADR‑006)**
+
+Once `LLM_MASTER_KEY` is set in your environment (e.g. via `setx LLM_MASTER_KEY "..."` on Windows), you can manage API keys at runtime:
+
+- `/key groq sk-your‑key` → Store an encrypted Groq key  
+- `/key openai sk-your‑key` → Store an encrypted OpenAI key  
+- `/key list` → Show which providers have keys stored  
+- `/key remove <provider>` → Remove a stored key  
+
+Keys are stored encrypted in `/workspace/.keys.enc` and never appear in logs or in Git.  
+See `docs/ADR-006-Session-key-management.md` for details.
 
 **Memory handling**
 
@@ -215,6 +224,12 @@ docker compose run py-coding-agent
 Both the agent and datetime MCP server start automatically via Docker Compose.
 
 ---
+### Secure key setup (LLM_MASTER_KEY)
+
+To enable encrypted API key management (ADR‑006), you must set `LLM_MASTER_KEY` outside of Git and `.env`.
+
+See the detailed guide in:
+- [`docs/HOW-TO-SETUP-KEYS.md`](./docs/HOW-TO-SETUP-KEYS.md)
 
 ### How to use (including provider switching)
 
@@ -301,6 +316,7 @@ Run normal tasks (all of these automatically use the currently active provider):
 * [x] Session manager  
 * [x] **Dependency locking strategy (ADR‑007)** — hybrid `uv lock` workflow on host vs Docker  
 * [x] Tight‑binding model selection in provider instances (ADR‑009)  
+* [x] ADR‑006 (Provider Registry, Session Management, and Key Management) is fully implemented and secure in the current state.
 * [ ] Smart provider routing by task type (ADR‑008) — e.g., `ollama` for local/private, `groq` for fast tools, `anthropic` for complex reasoning  
 
 **Milestone 4 (Polish)**
