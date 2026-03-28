@@ -17,8 +17,8 @@ class OllamaProvider(LLMProvider):
     before sending, and normalizes Ollama responses back to the canonical dict.
     """
 
-    def __init__(self, model_name: Optional[str] = None):
-        super().__init__(model_name=model_name)
+    def __init__(self, model_name: Optional[str] = None, api_key: Optional[str] = None):
+        super().__init__(model_name=model_name, api_key=api_key)
         self.base_url = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
         # Use CLI‑provided model first, env as fallback
         self.model_name = model_name or os.getenv(
