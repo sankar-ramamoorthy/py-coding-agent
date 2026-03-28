@@ -1987,6 +1987,7 @@ name = "py-coding-agent"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "fastmcp" },
     { name = "litellm" },
     { name = "mcp" },
@@ -1998,6 +1999,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography" },
     { name = "fastmcp", specifier = "==3.1.1" },
     { name = "litellm", specifier = "==1.82.6" },
     { name = "mcp", specifier = ">=1.25.0" },

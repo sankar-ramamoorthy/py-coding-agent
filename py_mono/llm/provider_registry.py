@@ -16,19 +16,25 @@ REGISTRY: Dict[str, Type[LLMProvider]] = {
 }
 
 
-def get_provider(name: str, model: Optional[str] = None) -> LLMProvider:
+def get_provider(
+    name: str,
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
+) -> LLMProvider:
     """
-    Simple factory: return an LLMProvider instance for a given name.
+    Simple factory: return an LLMProvider instance for a given name  and optional key.
+.
 
     For now:
-    - OllamaProvider uses OLLAMA_MODEL, OLLAMA_BASE_URL
-    - LiteLLMProvider uses LITELLM_MODEL, API_KEYs from env.
+    - OllamaProvider uses OLLAMA_MODEL, OLLAMA_BASE_URL (unused: api_key).
+    - LiteLLMProvider uses LITELLM_MODEL, and API key from api_key first, then env.
 
-    Key management (encrypted /key commands) will plug into this later.
+    Key management (encrypted /key commands) plugs into this via api_key.
+
     """
     cls = REGISTRY.get(name)
     if not cls:
         raise ValueError(
             f"Unknown provider: {name}. Available: {list(REGISTRY.keys())}"
         )
-    return cls(model_name=model)  # tight‑bound model
+    return cls(model_name=model, api_key=api_key) # tight‑bound model

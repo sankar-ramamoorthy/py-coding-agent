@@ -7,8 +7,9 @@ from typing import Optional
 class LLMProvider(ABC):
     """Base class for all LLM providers."""
 
-    def __init__(self, model_name: Optional[str] = None):
+    def __init__(self, model_name: Optional[str] = None, api_key: Optional[str] = None):
         self.model_name = model_name
+        self.api_key = api_key
         # providers can override or interpret this as needed
 
     @abstractmethod

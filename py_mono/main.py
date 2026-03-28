@@ -14,6 +14,9 @@ Environment Variables:
     DATETIME_MCP_URL    — datetime MCP server URL (default: http://datetime-mcp:50051/mcp)
 """
 
+
+from typing import Optional
+
 from py_mono.config import LLM_PROVIDER
 from py_mono.agent.agent import Agent
 from py_mono.session.session_manager import SessionManager
@@ -26,6 +29,10 @@ from py_mono.tools.create_tool import create_tool_tool
 from py_mono.tools.list_files import list_files_tool
 from py_mono.tools.tool_loader import load_dynamic_tools
 from py_mono.ui.cli import start_cli
+
+# Optional: if you want env‑only for now, this can be None
+from py_mono.security.key_manager import KeyManager
+import os
 
 
 
@@ -57,9 +64,6 @@ def load_mcp_tools() -> list:
 
 
 def main():
-    """
-    Initialize the agent and start the CLI.
-    """
     # Base tools
     base_tools = [
         read_tool,
@@ -71,7 +75,7 @@ def main():
         list_files_tool,
     ]
 
-    # Dynamic tools from dynamic_tools/ folder
+    # Dynamic tools
     dynamic_tools = load_dynamic_tools()
     if dynamic_tools:
         print(f"🔧 Loaded {len(dynamic_tools)} dynamic tool(s): {[t.name for t in dynamic_tools]}")
@@ -79,19 +83,28 @@ def main():
     # MCP tools
     mcp_tools = load_mcp_tools()
 
-    # Combine all tools
+    # Combined tools
     tools = base_tools + dynamic_tools + mcp_tools
 
-    # Initialize session manager with default provider from env
-    session_manager = SessionManager(default_provider=LLM_PROVIDER)
+    # KeyManager: create only if LLM_MASTER_KEY is set
+    key_manager: Optional[KeyManager] = None
+    if os.getenv("LLM_MASTER_KEY"):
+        key_manager = KeyManager()
+        print(f"🔐 KeyManager loaded with {len(key_manager.list_providers())} stored keys.")
 
-    # Create the agent
+    # Initialize session manager with default provider from env
+    session_manager = SessionManager(
+        default_provider=LLM_PROVIDER,
+        key_manager=key_manager,
+    )
+
+    # Create agent
     agent = Agent(session_manager, tools)
 
-
-    # Start the CLI
+    # Start CLI
     start_cli(agent)
 
 
 if __name__ == "__main__":
     main()
+
