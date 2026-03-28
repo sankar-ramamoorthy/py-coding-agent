@@ -1,6 +1,6 @@
 ## README.md
 # py-coding-agent
-
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sankar-ramamoorthy/py-coding-agent)
 A Dockerized Python coding agent that uses an LLM to reason, call tools, and execute tasks inside a **sandboxed workspace**.
 
 Inspired by autonomous agent systems like pi‑mono, this project explores **tool‑based reasoning, dynamic code execution, and self‑extending capabilities** using local or cloud LLMs.
