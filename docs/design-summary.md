@@ -40,3 +40,12 @@ The router is envisioned to operate **inside the `SessionManager`**: it takes a 
 - **Tight‑binding model selection (ADR‑009)**:
   - Implemented: `/provider <provider> <model>` binds the model to the provider instance, making it truthfully the active model for that session.  
   - Env variables remain the default fallback when no model is explicitly given.
+
+
+**Agent skills layer (Milestone 5)**:
+  - Implement reusable workflows via `/skill <name>`:
+    - `bug_fix` — fix bugs from error messages.
+    - `refactor_extract_function` — extract blocks into helper functions.
+    - `doc_sync` — keep doc comments and READMEs in sync with code.
+  - Gate execution with `status: proposed` / `status: approved` (ADR‑010).
+  - Allow operator‑approved dry‑run modes for risky skills.

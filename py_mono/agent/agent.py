@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional
 from py_mono.session.session_manager import SessionManager
 from py_mono.llm.provider_registry import REGISTRY, get_provider
 #from py_mono.utils.special_commands import is_special_command,handle_special_command
+from py_mono.skill.base import SkillContext, SkillRegistry
+from py_mono.config import WORKSPACE_ROOT
 
 class Agent:
     """
@@ -26,6 +28,7 @@ class Agent:
         self,
         session_manager: SessionManager,
         tools: List[Any],
+        skill_registry: Optional[SkillRegistry] = None,
         max_steps: int = 10,
         debug: bool = True,
         auto_prune_after: int = 5,
@@ -50,6 +53,7 @@ class Agent:
         self.last_tool_call: Optional[tuple] = None
         self.repeat_count = 0
         self.tool_call_count = 0
+        self.skill_registry = skill_registry
 
     def _log(self, *args: Any) -> None:
         if self.debug:
@@ -72,9 +76,90 @@ class Agent:
             return True
         if text.startswith("/provider "):
             return True
+
+        if text == "/skill list":
+            return True
+        if text.startswith("/skill help "):
+            return True
+        if text.startswith("/skill "):
+            return True
+
         return False
 
-
+    def _handle_skill_list(self) -> str:
+        """Return a formatted list of all available skills."""
+        if self.skill_registry is None:
+            return "[SKILL] No skill registry configured."
+    
+        skills = self.skill_registry.list_skills()
+        if not skills:
+            return "[SKILL] No skills found. Add skills under the skills/ directory."
+    
+        lines = ["Available skills:\n"]
+        for s in skills:
+            code_marker = "✅" if s["has_code"] else "📋"
+            status_marker = "🔒 proposed" if s["status"] == "proposed" else "✅ approved"
+            lines.append(
+                f"  {code_marker} {s['name']:30s} {s['description'][:60]}  [{status_marker}]"
+            )
+        return "\n".join(lines)
+    
+    
+    def _handle_skill_help(self, skill_name: str) -> str:
+        """Return the SKILL.md content for a named skill."""
+        if self.skill_registry is None:
+            return "[SKILL] No skill registry configured."
+    
+        content = self.skill_registry.get_skill_md(skill_name)
+        if content is None:
+            return f"[SKILL] No skill named '{skill_name}' found."
+        return f"--- SKILL.md: {skill_name} ---\n{content}"
+    
+    
+    def _handle_skill_run(self, text: str) -> str:
+        """
+        Route /skill <name> [args] to the matching skill.
+        Enforces approval check before execution.
+        """
+        if self.skill_registry is None:
+            return "[SKILL] No skill registry configured."
+    
+        parts = text.strip().split(maxsplit=2)
+        if len(parts) < 2:
+            return "Usage: /skill <name> [args]"
+    
+        skill_name = parts[1]
+        skill = self.skill_registry.get(skill_name)
+    
+        if skill is None:
+            available = [s["name"] for s in self.skill_registry.list_skills()]
+            return (
+                f"[SKILL] Unknown skill '{skill_name}'. "
+                f"Available: {', '.join(available) or 'none'}\n"
+                f"Use /skill list to see all skills."
+            )
+    
+        # Approval check (ADR-010 review model)
+        if not self.skill_registry.is_approved(skill_name):
+            return (
+                f"[SKILL] Skill '{skill_name}' is not approved for execution.\n"
+                f"Status: proposed. To approve, set 'status: approved' in "
+                f"skills/{skill_name}/SKILL.md."
+            )
+    
+        # Build context and run
+        context = SkillContext(
+            workspace_root=WORKSPACE_ROOT,
+            session_manager=self.session_manager,
+            agent_tools=self.tools,
+        )
+    
+        try:
+            result = skill.run(request=text, context=context)
+            return result
+        except Exception as e:
+            return f"[SKILL ERROR] {skill_name} failed: {str(e)}"
+ 
 
     def _handle_special_command(self, text: str) -> str:
         text = text.strip()
@@ -121,7 +206,16 @@ class Agent:
                 return f"Switched provider to {current.__class__.__name__} ({provider_key})."
             except Exception as e:
                 return f"Could not switch provider: {e}"
-
+        if text == "/skill list":
+            return self._handle_skill_list()
+    
+        if text.startswith("/skill help "):
+            skill_name = text[len("/skill help "):].strip()
+            return self._handle_skill_help(skill_name)
+    
+        if text.startswith("/skill "):
+            return self._handle_skill_run(text)
+    
         return ""
 
 

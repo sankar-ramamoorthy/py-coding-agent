@@ -33,7 +33,7 @@ from py_mono.ui.cli import start_cli
 # Optional: if you want env‑only for now, this can be None
 from py_mono.security.key_manager import KeyManager
 import os
-
+from py_mono.skill.base import SkillRegistry
 
 
 #deleted init_provider() entirely; 
@@ -61,6 +61,21 @@ def load_mcp_tools() -> list:
         traceback.print_exc()  # ← add this
         print(f"⚠️  MCP tools unavailable: {e}")
         return []
+ 
+def load_skills() -> SkillRegistry:
+    """
+    Load and return the SkillRegistry.
+    Scans skills/ directory at project root.
+    """
+    registry = SkillRegistry()
+    registry.load()
+    skills = registry.list_skills()
+    if skills:
+        names = [s["name"] for s in skills]
+        print(f"🎯 Loaded {len(skills)} skill(s): {names}")
+    else:
+        print("🎯 No skills found (skills/ directory empty or missing).")
+    return registry
 
 
 def main():
@@ -83,6 +98,7 @@ def main():
     # MCP tools
     mcp_tools = load_mcp_tools()
 
+    skill_registry = load_skills()
     # Combined tools
     tools = base_tools + dynamic_tools + mcp_tools
 
@@ -99,7 +115,7 @@ def main():
     )
 
     # Create agent
-    agent = Agent(session_manager, tools)
+    agent = Agent(session_manager, tools, skill_registry )
 
     # Start CLI
     start_cli(agent)
