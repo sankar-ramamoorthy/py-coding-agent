@@ -6,7 +6,7 @@ def build_create_tool_prompt(tool_name: str, description: str, parameters: dict,
     
     Args:
         tool_name: Name of the tool to create
-        description: Short description of the tool's purpose
+        description: Short description of the tool's purpose. and return type  str,dict,JSON, or list
         parameters: Dict of parameters in standard Tool format
         instructions: Optional extra instructions for the tool logic
     Returns:

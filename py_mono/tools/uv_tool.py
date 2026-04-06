@@ -37,7 +37,8 @@ def install_package(package_name: str) -> str:
 
 uv_tool = Tool(
     name="install_package",
-    description="Install a Python package using uv inside the Docker container",
+    description=("Install a Python package using uv inside the Docker container"
+                 "Returns: str: Success or error message"),
     func=install_package,
     parameters={
         "type": "object",

@@ -1,7 +1,7 @@
 # skills/refactor_extract_function/skill.py
 
 """
-Full‑fledged skill to extract a code block into a new helper function.
+Full-fledged skill to extract a code block into a new helper function.
 
 Given: file + start_line + end_line + name.
 

@@ -7,7 +7,8 @@ def tool_to_schema(tool) -> dict:
         "function": {
             "name": tool.name,
             "description": tool.description,
-            "parameters": tool.parameters  # you'll need to add this to Tool
+            "parameters": tool.parameters  ,
+            "returns": getattr(tool, "returns", None),
         }
     }
 

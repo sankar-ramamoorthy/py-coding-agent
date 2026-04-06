@@ -61,6 +61,7 @@ class SkillContext:
         self.workspace_root = workspace_root
         self.session_manager = session_manager
         self.agent_tools = agent_tools
+        self.calling_skill: Optional[str] = None  # <-- track parent skill
 
 
     def __repr__(self) -> str:
@@ -166,6 +167,9 @@ class SkillRegistry:
         Scan skills/ directory and load all valid skills.
         Called once at agent startup.
         """
+        self._skills.clear()
+        self._metadata.clear()
+        print("DEBUG SKILLRegistry load")
         if not self.skills_dir.exists():
             logger.warning(f"Skills directory not found: {self.skills_dir}")
             return
@@ -202,8 +206,44 @@ class SkillRegistry:
                     f"(SKILL.md only, no skill.py)"
                 )
 
+    # inside SkillRegistry class
+    def reload_skill(self, skill_name: str) -> bool:
+        """
+        Reload a single skill from disk (SKILL.md + optional skill.py).
+        Returns True if skill was successfully reloaded, False otherwise.
+        """
+        skill_dir = self.skills_dir / skill_name
+        skill_md = skill_dir / "SKILL.md"
+        skill_py = skill_dir / "skill.py"
+
+        if not skill_md.exists():
+            logger.warning(f"Cannot reload '{skill_name}' — SKILL.md missing")
+            return False
+
+        # Parse front-matter
+        meta = self._parse_skill_md(skill_md)
+        self._metadata[skill_name] = meta
+
+        # Load skill.py if exists
+        if skill_py.exists():
+            skill = self._load_skill_py(skill_py, skill_name)
+            if skill:
+                self._skills[skill_name] = skill
+                logger.info(f"🔄 Reloaded skill '{skill_name}' (code + metadata)")
+                return True
+            else:
+                logger.warning(f"Failed to load skill.py for '{skill_name}'")
+                self._skills.pop(skill_name, None)
+                return False
+        else:
+            # SKILL.md-only skill
+            self._skills.pop(skill_name, None)
+            logger.info(f"🔄 Reloaded skill spec '{skill_name}' (SKILL.md only)")
+            return True
+        
     def get(self, name: str) -> Optional[Skill]:
         """Return a skill by name, or None if not found."""
+        print("DEBUG self._skills",self._skills)
         return self._skills.get(name)
 
     def list_skills(self) -> List[ListedSkill]:

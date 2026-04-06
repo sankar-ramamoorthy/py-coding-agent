@@ -6,7 +6,7 @@
 ## Relation to project layout
 
 - `py_mono/skill/` contains the skills framework (`Skill`, `SkillContext`, `SkillRegistry`).  
-- `py_mono/skills/` contains the concrete skill implementations (each in its own subdirectory with `SKILL.md` and `skill.py`).
+- `skills/` contains the concrete skill implementations (each in its own subdirectory with `SKILL.md` and `skill.py`).
 
 ## Overall role
 

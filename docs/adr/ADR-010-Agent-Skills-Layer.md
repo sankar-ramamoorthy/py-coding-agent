@@ -30,12 +30,34 @@ Skills should be:
 - Safe to execute within the existing sandbox,  
 - Reviewable before being used.
 
----
+--- Update 2026/03/29 
 
 ## Decision
 
 Introduce an **agent skills layer** with the following characteristics:
 
+## Context
+
+The agent requires a structured abstraction layer for encapsulating discrete capabilities beyond basic LLM reasoning. Previously, the focus was on static skills discovered from `skills/`. We now introduce an integrated mechanism to scaffold new skills dynamically within the repository, enabling a developer workflow without standalone scripts.
+
+## Decision
+
+- Maintain the **Skill abstraction** as the primary interface for LLM-invoked capabilities.  
+- Skills are loaded dynamically from `skills/` using the SkillRegistry.  
+- New skills can be **scaffolded interactively** using the `/skill generate-skill` internal dev skill.  
+  - Generates `SKILL.md` + `skill.py` with optional helpers and tool references.  
+  - Defaults to `status: proposed` to prevent production execution until approved.  
+- Skills remain **discoverable via the agent CLI** and `/skill help`.  
+- The agent continues to support execution of skills on **less capable open-source LLMs**, as skill logic executes locally in Python rather than relying solely on LLM reasoning.
+
+## Consequences
+
+- Developers can rapidly prototype new skills directly within the repo.  
+- Skills and dynamic tools can coexist: tools are registered manually or via `create_tool`, while skills can scaffold tools internally if needed.  
+- The SkillRegistry ensures consistent discovery and invocation patterns.  
+- Skills are compatible with smaller LLMs since execution is local.  
+- Adds a clear workflow for dev-only experimental skills without impacting production behavior.
+---
 ### 1. What a skill is
 
 A **skill** is a reusable, description‑driven pattern for a class of tasks. It consists of:

@@ -1,0 +1,20 @@
+{
+  "name": "py-coding-agent",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "py-coding-agent",
+
+  "workspaceFolder": "/app",
+
+  "extensions": [
+    "ms-python.python",
+    "ms-python.debugpy"
+  ],
+
+  "settings": {
+    "python.defaultInterpreterPath": "/root/.venv/bin/python"
+  },
+
+  "forwardPorts": [5678],
+
+  "postCreateCommand": "pip install debugpy"
+}

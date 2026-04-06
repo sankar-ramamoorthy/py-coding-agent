@@ -48,7 +48,8 @@ def list_files(path=".", recursive=False, max_depth=2):
 
 list_files_tool = Tool(
     name="list_files",
-    description="List files and directories in the workspace",
+    description=("List files and directories in the workspace\n"
+                 "Return structured JSON for easier LLM parsing"),
     func=list_files,
     parameters={
         "type": "object",

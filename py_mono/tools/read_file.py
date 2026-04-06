@@ -34,7 +34,8 @@ def read_file(path="."):
 
 read_tool = Tool(
     name="read_file",
-    description="Read the contents of a file. Defaults to '.' for current directory.",
+    description=("Read the contents of a file. Defaults to '.' for current directory.\n"
+                 "Returns: str: File contents, or actionable error message"),
     func=read_file,
     parameters={
         "type": "object",

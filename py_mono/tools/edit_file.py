@@ -58,7 +58,8 @@ edit_tool = Tool(
     name="edit_file",
     description=(
         "Edit a file by replacing an exact string with new content. "
-        "Use read_file() first to get the exact old_content to replace."
+        "Use read_file() first to get the exact old_content to replace.\n"
+        "Returns:        str: Success message or actionable error"
     ),
     func=edit_file,
     parameters={

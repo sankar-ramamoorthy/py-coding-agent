@@ -6,9 +6,13 @@ services:
     image: py-coding-agent
     stdin_open: true
     tty: true
+    ports:
+      - "5678:5678"
     volumes:
+      - .:/app       
       - ./workspace:/workspace
       - ./dynamic_tools:/app/dynamic_tools
+      - ./skills:/app/skills    
     environment:
       - LLM_MASTER_KEY=${LLM_MASTER_KEY}
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
