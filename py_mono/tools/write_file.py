@@ -36,7 +36,8 @@ def write_file(path=None, content=""):
 
 write_tool = Tool(
     name="write_file",
-    description="Write content to a file. Defaults to './output.txt' if path is empty or '.'",
+    description=("Write content to a file. Defaults to './output.txt' if path is empty or '.' \n"
+                 "Returns str: Success message or actionable error"),
     func=write_file,
     parameters={
         "type": "object",

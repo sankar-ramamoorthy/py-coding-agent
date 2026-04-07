@@ -1,0 +1,85 @@
+<think>
+Okay, let's see. I need to create a Python skill called mypi6 that lists all Python programs in the current directory. The user provided a lot of details, so I need to make sure I follow all the constraints and use the right tools.
+
+First, the skill must be a subclass of Skill. The name method should return "mypi6" exactly. The description is given. The run method needs to execute the task.
+
+Looking at the allowed tools, the list_files tool is available. Wait, but the example uses something like workspace.rglob. Oh, but according to the SKILL.md, allowed_tools is [list_files], so maybe I need to use that tool instead of directly accessing the workspace? Wait, the constraints say "workspace only", so maybe the correct approach is to use the list_files tool? Or perhaps the list_files tool is part of the agent_tools?
+
+Wait, the note says: " AVAILABLE TOOLS (retrieve via context.agent_tools, execute via tool.run(...)) :: list_files is one of them. But how does list_files work? Maybe the list_files tool lists all files in the workspace. However, in the example, the ListFilesSkill uses workspace.rglob. But maybe in this case, since the allowed tool is list_files, I should use that tool instead of accessing the workspace directly.
+
+Wait, but the code example for the ListFilesSkill uses the workspace directly. Hmm. Let me check the instructions again. The user says for mypi6, allowed_tools is [list_files], so perhaps the correct approach is to use the list_files tool. But maybe the list_files tool is a function that returns a list of files. Alternatively, perhaps the user is supposed to use the context.workspace_root and then filter .py files. Because in the working example, the files are collected via workspace.rglob.
+
+But according to the working example, the ListFilesSkill uses the workspace.rglob. But maybe the allowed_tools for that example were different. For the current skill, the allowed_tools is list_files. Wait, the SKILL.md for mypi6 says allowed_tools is [list_files]. But maybe the list_files tool is provided as an agent tool, so the code should call that tool instead of using the workspace Root directly.
+
+But how would that work? Let me think. If the list_files tool is part of the agent tools, then perhaps it's a function that returns a list of files. For example, maybe the tool's run function lists all files. So, for the mypi6 skill, the code should call context.agent_tools["list_files"].run(...) to get the list of files. But the tool's run might return all files, so then we need to filter those that are .py files.
+
+Alternatively, perhaps the list_files tool's functionality is to list all files, and then we filter on .py. But according to the mypi6's constraints, it's supposed to list all .py files in the current directory. So the approach would be to get the list of files (using the tool), filter them for .py, then present the list.
+
+But wait, the working example shows a skill that uses the workspace directly. Let me check the working example again. The example uses context.workspace_root and does rglob. The allowed_tools in that example's case might not include list_files. Maybe the user is allowed to use either the tool or directly access the workspace. However, the mypi6's allowed tool is list_files, so perhaps the correct approach here is to use that tool instead of accessing the workspace directly. However, the allowed imports include pathlib and os.path, so perhaps the user can use the workspace.
+
+But according to the constraints, the mypi6 skill is allowed to read files in the workspace and filter for .py. So, perhaps the best approach is to use the context.workspace_root, as in the example, but then filter for .py files. Let me look again at the SAFETY RULES. It says to never use os.system, etc., but for listing files, using the workspace's rglob is acceptable.
+
+So in code: the run method will check the workspace_root, gather all .py files, then format the list.
+
+But wait, the SKILL.md says allowed tools are [list_files], which may imply that the skill should use that tool. However, maybe the list_files tool is a helper function that returns all files in the workspace. Let me check the available tools again.
+
+The available tools are listed as list_files (returns list). But how to use it. For example, if the list_files tool's run method returns a list of file paths. Then the code would call it, filter the list for .py files, and then present them.
+
+But perhaps the skill is allowed to directly access the workspace. The user's example uses the workspace directly. Let's look at the SKILL.md constraints for mypi6: it's read-only, workspace only, no network. So using workspace.rglob is acceptable. Also, since allowed_tools includes list_files, maybe using that tool is optional here.
+
+But perhaps the list_files tool is supposed to be used. Let's see the note on how to call a tool. The example shows:
+
+HOW TO CALL A TOOL:
+    tool = context.agent_tools.get("shell")
+    if not tool:
+        return "Error: shell tool not available"
+
+    result = tool.run({ "command": "ls -la" })
+
+But how does the list_files tool work? The description says that the list_files tool returns a list. So perhaps when you call it, it returns all files in the workspace. So for this skill, we can call list_files, get the list, then filter for .py.
+
+But I need to check which approach is correct. If the skill is allowed to use list_files as a tool, but the code can also access the workspace directly. However, the user's example (the Working Example Skill) uses the workspace directly. But perhaps that's because that example's allowed tools might not include list_files. Hmm.
+
+In the case of the mypi6 skill, since allowed_tools is [list_files], perhaps it's intended to use that tool. But perhaps the list_files tool's run function returns a list of file paths. For example, in that case, the code would do something like:
+
+tool = context.agent_tools.get("list_files")
+if tool:
+    all_files = tool.run(...)
+    py_files = [f for f in all_files if f.endswith('.py')]
+Then format.
+
+But I don't know the exact signature of the list_files tool. However, looking back to the HOW TO USE WORKSPACE section, they do:
+
+workspace = context.workspace_root
+files = list(workspace.rglob("*.py"))
+
+Which is a direct approach. Since the allowed tools include list_files, but it's possible that the user can choose between using the tool or workspace. However, for the sake of following the allowed tools, maybe the correct approach is to use the list_files tool. But if the tool is supposed to provide the list of files, then perhaps the code should call it.
+
+But without knowing exactly what parameters the list_files tool expects, perhaps the safer approach is to follow the working example and directly use the workspace_root. Because in the working example, the allowed tools may be different. Since the allowed_tools for mypi6 includes list_files, but perhaps the intended way is to use that tool. However, since the list_files tool is of type Tool, which when run may return the list of files.
+
+But let's see. The user's instruction for skill mypi6 is to list all .py in current directory. So perhaps the code can be written as:
+
+class Mypi6Skill(Skill):
+    def name(self): return "mypi6"
+    def description(self): return "list all python programs in '.'"
+    def run(self, request, context):
+        try:
+            workspace = context.workspace_root
+            files = list(workspace.glob("*.py"))  # current dir, not recursive
+            if not files:
+                return "No .py files found in current directory."
+            return "\n".join(f"- {f.name}" for f in files)
+        except Exception as e:
+            return f"[mypi6] Error: {e}"
+
+But wait, the initial SKILL.md description says to list all python programs in ".", which is the current directory. So using glob("*.py") in the workspace root. But what if the workspace_root is a directory, and the current working directory is not the workspace_root? Wait, according to the HOW TO USE WORKSPACE note, the workspace_root is sandboxed workspace, so perhaps the workspace_root is the current directory, so using glob with "*.py" would find the .py files in the current directory.
+
+But workspace.glob("*.py") would find files in the workspace_root directory (current directory) with .py extension, not in subdirectories. So that's correct for the task.
+
+Alternatively, if the user wants to search all subdirectories as well, then use rglob. But the expected output for the skill is to list all in the current directory. The expected output says "current directory" (Usage example says that the output is files in the current directory). So glob, not rglob.
+
+So the code would proceed as:
+
+In run method, access the workspace_root, call glob("*.py"), collect those files, and present as bullet points. If none, return message.
+
+Now, the allowed tools include list_files. But perhaps the user wants to use that tool. But how? For example, if the list_files tool returns all files in the workspace, then the code could process them to filter .py in current directory. However, perhaps the list_files tool is designed for that. For example, maybe the list_files tool can take a directory parameter. However, since the tool's parameters are not specified, perhaps it's easier to directly use the workspace as in the example.

@@ -88,7 +88,7 @@ def _handle_key_command(
 
     if cmd == "help":
         return (
-            "Key management (ADR‑006):\n"
+            "Key management (ADR-006):\n"
             "/key <provider> <api_key>  → store encrypted key\n"
             "/key list                   → list providers with keys\n"
             "/key remove <provider>     → remove a stored key"

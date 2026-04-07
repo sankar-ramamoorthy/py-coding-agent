@@ -33,3 +33,5 @@ ENV PYTHONUNBUFFERED=1 \
 
 #CMD ["python", "py_mono/main.py"]
 CMD ["python", "-m", "py_mono.main"]
+#CMD ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "-m", "py_mono.main"]
+#CMD ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "py_mono.main"]

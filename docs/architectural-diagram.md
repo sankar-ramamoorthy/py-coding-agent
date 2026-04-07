@@ -1,142 +1,181 @@
+`docs/architectural-diagram.md`
+
+```markdown
 # Architectural Diagram
 
 ## Agent Loop
 
 ```
-                         ┌─────────────────┐
-                         │     User CLI     │
-                         └────────┬────────┘
-                                  │
-                      ┌───────────▼───────────┐
-                      │       Agent Loop      │
-                      │---------------------- │
-                      │ - Append user input   │
-                      │ - Check special cmds  │
-                      │   (/clear, /bye)      │
-                      │ - Send messages to    │
-                      │   LLM + tool list     │
-                      └───────────┬───────────┘
-                                  │
-                                  ▼
-                         ┌─────────────────┐
-                         │   LLM Provider  │
-                         │ --------------- │
-                         │ OllamaProvider  │
-                         │ LiteLLMProvider │
-                         │ (Groq/OpenAI/   │
-                         │  Anthropic etc) │
-                         │                 │
-                         │ - Decide: text  │
-                         │   response or   │
-                         │   tool call     │
-                         └────────┬────────┘
-                                  │
-                ┌─────────────────┴───────────────────┐
-                │                                     │
-       Tool call detected?                      Text response?
-                │                                     │
-        ┌───────▼────────┐                     ┌──────▼───────┐
-        │   Execute Tool │                     │  Return Text │
-        │ -------------- │                     │  to User     │
-        │ - Use Tool.func│                     └─────────────┘
-        │   (read/write/ │
-        │    shell/etc.) │
-        │ - Record result│
-        └───────┬────────┘
-                │
-     Auto-prune memory after N tool calls?
-                │
-        ┌───────▼────────┐
-        │  Prune Memory  │
-        │  (keep last N) │
-        └───────┬────────┘
-                │
-      Memory updated in agent loop
-                │
-                ▼
-           ┌─────────────┐
-           │ Back to LLM │
-           └─────────────┘
-                │
-                ▼
-         Final answer returned
-                │
-                ▼
-             User CLI
+
 ```
+                     ┌─────────────────┐
+                     │     User CLI     │
+                     └────────┬────────┘
+                              │
+                  ┌───────────▼───────────┐
+                  │       Agent Loop      │
+                  │---------------------- │
+                  │ - Append user input   │
+                  │ - Check special cmds  │
+                  │   (/clear, /bye, etc) │
+                  │ - Send messages to    │
+                  │   LLM + tool list     │
+                  └───────────┬───────────┘
+                              │
+                              ▼
+                     ┌─────────────────┐
+                     │   LLM Provider  │
+                     │ --------------- │
+                     │ OllamaProvider  │
+                     │ LiteLLMProvider │
+                     │                 │
+                     │ - Decide: text  │
+                     │   or tool call  │
+                     └────────┬────────┘
+                              │
+            ┌─────────────────┴───────────────────┐
+            │                                     │
+   Tool call detected?                      Text response?
+            │                                     │
+    ┌───────▼────────┐                     ┌──────▼───────┐
+    │   Execute Tool │                     │  Return Text │
+    │ -------------- │                     │  to User     │
+    │ - Resolve tool │                     └─────────────┘
+    │   from registry│
+    │ - Parse args   │
+    │   (JSON → dict)│
+    │ - Execute via  │
+    │   Tool.run(...)│
+    │   (kwargs only)│
+    │ - Capture      │
+    │   result/error │
+    └───────┬────────┘
+            │
+ Auto-prune memory after N tool calls?
+            │
+    ┌───────▼────────┐
+    │  Prune Memory  │
+    │  (keep last N) │
+    └───────┬────────┘
+            │
+  Memory updated in agent loop
+            │
+            ▼
+       ┌─────────────┐
+       │ Back to LLM │
+       └─────────────┘
+            │
+            ▼
+     Final answer returned
+            │
+            ▼
+         User CLI
+```
+
+```
+
+---
+
+## Tool Abstraction Layer
+
+```
+
+```
+    Tool.run(**kwargs)
+           │
+           ▼
+    underlying function (_func)
+```
+
+```
+
+**Rules:**
+- All tool execution MUST go through `Tool.run(...)`
+- Arguments are passed as keyword arguments only
+- Direct access to `_func` is forbidden outside the Tool class
 
 ---
 
 ## LLM Provider Abstraction (ADR-005)
 
 ```
+
 agent.py
-  │
-  │  canonical OpenAI-style messages
-  │
-  ▼
+│
+│  canonical OpenAI-style messages
+│
+▼
 LLMProvider (base.py)
-  │
-  ├── OllamaProvider
-  │     │ to_wire_messages() → strips tool_call_id, fixes content: "" 
-  │     └── POST /api/chat → localhost:11434
-  │
-  └── LiteLLMProvider
-        │ to_wire_messages() → pass-through (OpenAI native)
-        └── litellm.completion()
-              │
-              ├── groq/qwen/qwen3-32b
-              ├── openai/gpt-4o
-              ├── anthropic/claude-3-5-haiku
-              └── ... any litellm provider
+│
+├── OllamaProvider
+│     │ to_wire_messages()
+│     │ - content: None → ""
+│     │ - strips tool_call_id
+│     └── HTTP /api/chat
+│
+└── LiteLLMProvider
+│ to_wire_messages() → pass-through
+└── litellm.completion()
+
 ```
+
+---
+
 ## MCP Integration (ADR-004)
 
+```
+
 agent (sync)
-  │
-  └── mcp_integration/mcp_tool.py
-        │ asyncio.run() bridge
-        ▼
-  mcp_integration/mcp_client.py
-        │ async fastmcp.Client
-        ▼
-  http://datetime-mcp:50051/mcp
-        │
-        ▼
-  mcp_servers/datetime (FastMCP container)
-        │
-        ▼
-  get_current_datetime_tool() → UTC ISO string
+│
+└── mcp_tool.py
+│ asyncio bridge
+▼
+mcp_client.py (async)
+▼
+MCP Server (FastMCP)
+▼
+Tool result → agent loop
+
+```
+
 ---
 
 ## Canonical Message Format (ADR-005)
 
 ```
-# User message
-{"role": "user", "content": "list files"}
 
-# Assistant tool call (canonical)
+# Assistant tool call
+
 {
-  "role": "assistant",
-  "content": null,
-  "tool_calls": [
-    {
-      "id": "<uuid>",
-      "type": "function",
-      "function": {
-        "name": "list_files",
-        "arguments": "{}"      ← JSON string
-      }
-    }
-  ]
+"role": "assistant",
+"content": null,
+"tool_calls": [
+{
+"id": "<uuid>",
+"type": "function",
+"function": {
+"name": "tool_name",
+"arguments": {"key": "value"}
+}
+}
+]
 }
 
-# Tool result (canonical)
+# Tool result
+
 {
-  "role": "tool",
-  "tool_call_id": "<uuid>",
-  "content": "plain string result"
+"role": "tool",
+"tool_call_id": "<uuid>",
+"content": "string result"
 }
+
+```
+
+**Flow:**
+```
+
+arguments (JSON) → parsed → Tool.run(**kwargs)
+
 ```
 
 ---
@@ -144,22 +183,24 @@ agent (sync)
 ## Dynamic Tool Lifecycle
 
 ```
-LLM calls create_tool(name, code)
-  │
-  ▼
-Tool file written to dynamic_tools/{name}.py
-  │
-  ▼
-load_dynamic_tools() scans folder
-  │
-  ▼
-isinstance(attr, Tool) check finds Tool objects
-  │
-  ▼
-self.tools updated → tool available immediately
-  │
-  ▼
-LLM can call new tool in same session
+
+LLM generates tool code
+│
+▼
+File written to dynamic_tools/
+│
+▼
+load_dynamic_tools()
+│
+▼
+isinstance(attr, Tool)
+│
+▼
+Registered in agent.tools
+│
+▼
+Executable via Tool.run(...)
+
 ```
 
 ---
@@ -167,25 +208,28 @@ LLM can call new tool in same session
 ## Memory Structure
 
 ```
+
 [
-  {"role": "system",    "content": "<system prompt>"},   ← immutable
-  {"role": "user",      "content": "<user query>"},
-  {"role": "assistant", "tool_calls": [...]},             ← tool call
-  {"role": "tool",      "content": "<result>"},           ← tool result
-  {"role": "assistant", "content": "<final answer>"},     ← text response
-  ...
+{"role": "system", "content": "..."},
+{"role": "user", "content": "..."},
+{"role": "assistant", "tool_calls": [...]},
+{"role": "tool", "content": "..."},
+{"role": "assistant", "content": "..."}
 ]
+
 ```
 
-Auto-pruned every N tool calls (default: 5), keeping last 20 messages.
-System prompt is always preserved.
+- Auto-pruned every N tool calls
+- System prompt always preserved
 
 ---
 
-## Legend / Notes
+## Key Design Rules
 
-- Special commands `/clear` and `/bye` are checked before LLM call
-- `/clear` resets memory to system prompt only and resets all loop guards
-- Loop guard fires if same tool called with same args twice — nudges LLM via `role: user` message
-- All file operations go through `resolve_safe_path()` — sandbox enforced at every layer
-- Dynamic tools volume mounted at `./dynamic_tools:/app/dynamic_tools` — no rebuild needed
+- Tools are **not raw functions** — they are controlled execution units
+- `.run()` is the **only public execution interface**
+- LLM never interacts with `.func`
+- Agent remains provider-agnostic
+- All file access is sandboxed via workspace root
+```
+

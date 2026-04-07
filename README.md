@@ -152,15 +152,24 @@ See `docs/ADR-006-Session-key-management.md` for details.
 ### Project Structure
 
 ```
+
 py_mono/
-├── agent/            # Core agent loop
-├── llm/              # Ollama + LiteLLM providers, tool schemas
-├── mcp_integration/  # MCP client and tool wrappers
-├── tools/            # Built-in and dynamic tools
-├── utils/            # Path safety + helpers
-├── ui/               # CLI interface
-├── config.py         # Environment configuration
-└── main.py           # Entry point
+├── agent/ → Core agent loop and minimal reasoning loop.
+├── llm/ → Ollama and LiteLLM providers, tool schemas, prompts.
+├── mcp_integration/ → MCP client and tool wrappers for external servers.
+├── memory/ → Memory‑related helpers (future utilities).
+├── mom/ → Multi‑objective monitoring helpers (future).
+├── pods/ → Pod‑style micro‑agent helpers (future).
+├── security/ → Encrypted key management (KeyManager).
+├── session/ → SessionManager and provider‑binding logic.
+├── skill/ → Skills framework (base Skill class, SkillContext, SkillRegistry).
+├── skills/ → Concrete skills (e.g., bug_fix, refactor_extract_function, doc_sync, hello).
+├── tools/ → Built‑in and dynamically‑loaded tools (read_file, write_file, shell, etc.).
+├── ui/ → CLI interface.
+├── utils/ → Path‑safety and utility functions.
+├── config.py → Environment configuration and constants.
+└── main.py → Top‑level entry point and application wiring.
+
 
 mcp_servers/          # MCP microservices
 └── datetime/         # Datetime MCP server (FastMCP + HTTP)
@@ -170,6 +179,9 @@ workspace/            # Mounted safe working directory
 docs/
 ├── adr/              # Architectural Decision Records
 └── *.md              # Design and architecture docs
+
+This layout keeps the skills layer clearly separated (`py_mono/skill` for the framework, `py_mono/skills` for concrete skill implementations), while tools, providers, and session logic remain distinct.
+
 ```
 
 ---
@@ -287,7 +299,45 @@ Run normal tasks (all of these automatically use the currently active provider):
 * LLM may answer from stale memory instead of re‑reading files after edits  
 
 ---
+  ``` 
+  See `docs/README_Skills.md` for a full description of the skills layer and how it differs from Claude‑style Markdown‑only skills.
+  ```
+## Skills Layer (Milestone 5)
 
+The agent now supports a **skills layer** that lets you run predefined coding workflows via `/skill <name>`.
+
+### How skills work
+
+- Skills live under `skills/<skill_name>/`:
+  - `SKILL.md` — YAML front‑matter + human‑readable spec.
+  - `skill.py` — optional Python implementation.
+- They are discovered and registered by `SkillRegistry` at startup.
+- Skills are gated by `status: proposed` / `status: approved` (ADR‑010 review model).
+
+### Example commands
+
+```
+/skill list                    → show all skills
+/skill help <skill_name>       → show SKILL.md for a skill
+/skill <skill_name> ...        → run an approved skill
+
+Current reference skills
+
+    bug_fix — Fix a bug from a stack trace or error message.
+
+    refactor_extract_function — Extract a code block into a helper function.
+
+    doc_sync — (planned) Synchronize doc comments and user‑faced docs with code.
+```
+
+```
+| Aspect                | Claude‑style skills                                      |  py‑coding‑agent skills                                 |
+| --------------------- | -------------------------------------------------------- | ----------------------------------------------------------- |
+| Skill definition      | Markdown‑driven (SKILL.md / natural‑language steps)      | Markdown spec (SKILL.md) plus executable code (skill.py).   |
+| Where logic lives     | The LLM “reads the markdown and figures out how to act.” | We write explicit Python (run(...), tool calls, tests).    |
+| Runtime precision     | Flexible, LLM‑interpreted.                               | Deterministic, code‑defined behavior.                       |
+| Safety / review model | Often controlled by UI / toggles.                        | Explicit approval gate in YAML (status: proposed/approved). |
+```
 ### Roadmap
 
 **Milestone 1 (Core Agent) ✅**
@@ -326,6 +376,13 @@ Run normal tasks (all of these automatically use the currently active provider):
 * [ ] Packaging  
 
 ---
+**Agent skills layer (Milestone 5)**:
+  - Implement reusable workflows via `/skill <name>`:
+    - `bug_fix` — fix bugs from error messages.
+    - `refactor_extract_function` — extract blocks into helper functions.
+    - `doc_sync` — keep doc comments and READMEs in sync with code.
+  - Gate execution with `status: proposed` / `status: approved` (ADR‑010).
+  - Allow operator‑approved dry‑run modes for risky skills.
 
 ### Future Enhancements (V2)
 

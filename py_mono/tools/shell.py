@@ -67,7 +67,8 @@ def run_shell(command: str) -> str:
 
 shell_tool = Tool(
     name="shell",
-    description="Run a shell command in the workspace and return stdout + stderr. Blocks dangerous commands.",
+    description=("Run a shell command in the workspace and return stdout + stderr. Blocks dangerous commands."
+                 "Returns: str: stdout + stderr output, or actionable error message"),
     func=run_shell,
     parameters={
         "type": "object",

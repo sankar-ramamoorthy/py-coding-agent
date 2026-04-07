@@ -147,6 +147,54 @@ The agent maintains a **conversation memory**:
 4. **Tool results**
 5. **Assistant text responses**
 
+
+***
+
+
+```markdown
+## Skills Layer (Milestone 5)
+
+A skills layer sits on top of the minimal loop and tools, exposing higher‑level workflows via `/skill <name> ...`.
+
+### Design
+
+- Each skill is defined under:
+  - `skills/<skill_name>/SKILL.md` (required)
+  - `skills/<skill_name>/skill.py` (optional subclass of `Skill`).
+- `SkillRegistry`:
+  - Discovers all `skills/<skill_name>/SKILL.md` files.
+  - Loads `skill.py` if present.
+  - Tracks `status: proposed` / `status: approved` for each skill.
+- `SkillContext`:
+  - Provides `workspace_root`, `session_manager`, and `agent_tools` to every skill at runtime.
+- Skills can:
+  - Call existing tools (`read_file`, `write_file`, `shell`, etc.).
+  - Write tests and run them.
+  - Read and write code in the sandbox.
+
+### Safety and approval model (ADR‑010)
+
+- By default, skills are `status: proposed` and **not executable**.
+- Only when `status: approved` may an agent run the skill.
+- This mimics a PR‑style review gate: “spec + code exists, but must be explicitly approved before execution”.
+
+### Example skills
+
+- `bug_fix`:
+  - Input: error message + file + line range.
+  - Output: minimal fix + small test.
+- `refactor_extract_function`:
+  - Input: file + start/end line + new function name.
+  - Output: new helper function + updated caller + test.
+
+| Aspect                | Claude‑style skills                                      |  py‑coding‑agent skills                                 |
+| --------------------- | -------------------------------------------------------- | ----------------------------------------------------------- |
+| Skill definition      | Markdown‑driven (SKILL.md / natural‑language steps)      | Markdown spec (SKILL.md) plus executable code (skill.py).   |
+| Where logic lives     | The LLM “reads the markdown and figures out how to act.” | We write explicit Python (run(...), tool calls, tests).    |
+| Runtime precision     | Flexible, LLM‑interpreted.                               | Deterministic, code‑defined behavior.                       |
+| Safety / review model | Often controlled by UI / toggles.                        | Explicit approval gate in YAML (status: proposed/approved). |
+
+```
 **Special Commands**
 
 - `/clear` → resets conversation memory to system prompt only, resets all loop guards
@@ -183,13 +231,26 @@ The agent maintains a **conversation memory**:
 * Runtime provider switching (e.g. `/provider ollama`, `/provider litellm`)
 * Tight‑binding model selection in provider instances (ADR‑009)
 * **Dependency locking strategy (ADR‑007)** — hybrid `uv lock` workflow on host vs Docker
+* Encrypted API key management via KeyManager
 
 ## V3 Planned / In‑progress
 
-* Encrypted API key management via KeyManager
 * Smart provider routing by task type (ADR‑008) — e.g., `ollama` for local/private, `groq` for fast tools, `anthropic` for complex reasoning
 
-## V4 Ideas
+##  Skills‑Layer Ideas (Milestone 5)
+
+- **Agent skills layer (Milestone 5)**:
+  - Implement reusable workflows via `/skill <name>`:
+    - `bug_fix` — fix bugs from error messages.
+    - `refactor_extract_function` — extract blocks into helper functions.
+    - `doc_sync` — keep doc comments and READMEs in sync with code.
+  - Gate execution with `status: proposed` / `status: approved` (ADR‑010).
+
+  Planned
+  - Allow operator‑approved dry‑run modes for risky skills.
+
+
+## V5 Ideas
 
 * Multi-agent pods: planner, coder, tester
 * Tool schema validation and registry
