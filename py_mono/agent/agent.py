@@ -459,7 +459,7 @@ class Agent:
                     result = f"[TOOL ERROR] Unknown tool: {tool_name}"
                 else:
                     try:
-                        result = tool.func(**args)
+                        result = tool.run(**args)
                     except Exception as e:
                         result = f"[TOOL ERROR] {str(e)}"
 

@@ -53,7 +53,7 @@ class BugFixSkill(Skill):
             return "[BUG_FIX] Tool 'read_file' not found in agent_tools."
 
         read_file = agent_tools["read_file"]
-        read_result = read_file.func({"path": file_target})
+        read_result = read_file.run(path=file_target)
 
         if "Error" in read_result:
             return f"Failed to read {file_target}:\n{read_result}"
@@ -218,12 +218,11 @@ class BugFixSkill(Skill):
             error_str=error_str,
         )
 
-        w_result = write_file.func(
-            {
-                "path": str(test_path),
-                "content": test_code,
-            }
+        w_result = write_file.run(
+            path=str(test_path),
+            content=test_code,
         )
+
 
         if "Error" in str(w_result):
             return f"Failed to write test:\n{w_result}"
@@ -235,11 +234,10 @@ class BugFixSkill(Skill):
         shell = agent_tools["shell"]
         shell_cmd = f"pytest {test_rel.as_posix()}"
 
-        s_result = shell.func(
-            {
-                "command": shell_cmd,
-            }
+        s_result = shell.run(
+            command=shell_cmd,
         )
+
 
         return s_result.get("stdout", "") + s_result.get("stderr", "")
 

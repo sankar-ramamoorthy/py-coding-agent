@@ -13,7 +13,6 @@ See ADR-011 for design details.
 
 from typing import Dict, Any
 
-
 # ---------------------------------------------------------------------------
 # Example skill — injected into skill.py prompt as a reference implementation
 # ---------------------------------------------------------------------------
@@ -45,7 +44,6 @@ class ListFilesSkill(Skill):
             return f"[list-files-example] Error: {e}"
 '''
 
-
 # ---------------------------------------------------------------------------
 # Skill base class signature — injected into skill.py prompt
 # ---------------------------------------------------------------------------
@@ -56,7 +54,7 @@ from typing import Any, Dict
 
 class SkillContext:
     workspace_root: Path          # sandboxed workspace — use for all file ops
-    agent_tools: Dict[str, Any]   # tool_name → Tool (call via tool.func(**args))
+    agent_tools: Dict[str, Any]   # tool_name → Tool (call via tool.run(**kwargs))
     session_manager: Any          # active LLM provider session
 
 class Skill(ABC):
@@ -76,48 +74,37 @@ class Skill(ABC):
         ...
 '''
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _escape_for_fstring(s: str) -> str:
+    """Escape braces and quotes for safe insertion in f-strings"""
+    if not s:
+        return ""
+    return s.replace("{", "{{").replace("}", "}}").replace('"', '\\"')
+
+def _format_tool_signatures(available_tools: Dict[str, str]) -> str:
+    lines = []
+    for name, desc in available_tools.items():
+        if "command" in desc.lower():
+            example = f'{name}(command="...")'
+        elif "path" in desc.lower():
+            example = f'{name}(path="...")'
+        else:
+            example = f"{name}()"
+        lines.append(f"  - {example}")
+    return "\n".join(lines)
 
 # ---------------------------------------------------------------------------
 # Prompt builders
 # ---------------------------------------------------------------------------
-def _format_tool_signatures(available_tools: Dict[str, str]) -> str:
-    lines = []
-    for name, desc in available_tools.items():
-        # naive inference (good enough for now)
-        if "list" in desc.lower():
-            returns = "list"
-        else:
-            returns = "string"
-
-        # basic param inference (you can improve later)
-        if "command" in desc.lower():
-            params = "command: string"
-        elif "path" in desc.lower():
-            params = "path: string"
-        else:
-            params = ""
-
-        signature = f"{name}({params}) -> {returns}" if params else f"{name}() -> {returns}"
-        lines.append(f"  - {signature}")
-
-    return "\n".join(lines)
 
 def build_skill_md_prompt(
     skill_name: str,
     description: str,
     available_tools: Dict[str, str],  # tool_name → tool_description
 ) -> str:
-    """
-    Build the prompt for generating SKILL.md content.
-
-    Args:
-        skill_name       : the skill folder name (e.g. 'list-python-files')
-        description      : user-provided description
-        available_tools  : dict of tool_name → description
-
-    Returns:
-        str: full prompt text
-    """
     tool_lines = "\n".join(
         f"  - {name}: {desc}" for name, desc in available_tools.items()
     )
@@ -150,9 +137,11 @@ One paragraph explaining what this skill does.
 
 ## Usage
 
-```
+````
+
 /skill {skill_name}
-```
+
+````
 
 ## Expected Output
 
@@ -168,36 +157,25 @@ Rules:
 - Keep it concise and human-readable
 """
 
-
 def build_skill_py_prompt(
     skill_name: str,
     description: str,
     skill_md_content: str,
     available_tools: Dict[str, str],
     retry_reason: str = "",
+    prev_code: str = "",
 ) -> str:
-    """
-    Build the prompt for generating skill.py content.
-
-    Args:
-        skill_name       : the skill folder name (e.g. 'list-python-files')
-        description      : user-provided description
-        skill_md_content : the generated SKILL.md (so LLM knows allowed_tools)
-        available_tools  : dict of tool_name → description
-        retry_reason     : if non-empty, previous attempt failed — include reason
-
-    Returns:
-        str: full prompt text
-    """
     tool_lines = _format_tool_signatures(available_tools)
 
     retry_block = ""
     if retry_reason:
-        retry_block = f"""
-IMPORTANT — YOUR PREVIOUS ATTEMPT FAILED VALIDATION:
-{retry_reason}
-
+        retry_reason_escaped = _escape_for_fstring(retry_reason)
+        prev_code_escaped = _escape_for_fstring(prev_code)
+        retry_block = f"""IMPORTANT — YOUR PREVIOUS ATTEMPT FAILED VALIDATION:
+{retry_reason_escaped}
 Fix ALL of these issues in your new attempt.
+This was your previous attempt:
+{prev_code_escaped}
 """
 
     return f"""You are generating a skill.py file for a Python coding agent skill.
@@ -207,7 +185,6 @@ Do NOT include markdown code fences (no ``` or ```python.).
 Do NOT include any explanation or preamble.
 Do NOT include any text before or after the Python code.
 Python code should start with import and end with return.
-{retry_block}
 Skill name: {skill_name}
 Description: {description}
 
@@ -231,7 +208,18 @@ HOW TO CALL A TOOL:
     if not tool:
         return "Error: shell tool not available"
 
-    result = tool.run({{ "command": "ls -la" }})
+    result = tool.run(command=\"ls -la\")
+
+    CRITICAL TOOL CALLING RULES:
+- ALWAYS pass arguments as keyword arguments
+- NEVER pass a dictionary as a positional argument
+
+CORRECT:
+    tool.run(command=\"ls -la\")
+
+WRONG:
+    tool.run(\"ls -la\")
+    tool.run({{\"command\": \"ls -la\"}})
 
 HOW TO USE WORKSPACE:
     workspace = context.workspace_root  # Path object
@@ -275,5 +263,5 @@ Any output outside the requested format will be discarded.
 MUST import py_mono.skill.base (Skill, SkillContext)
 Do NOT wrap your response in ``` or ```python.
 Your output must be raw Python code only.
-If you include code fences, your output will be rejected.
+{retry_block}
 """

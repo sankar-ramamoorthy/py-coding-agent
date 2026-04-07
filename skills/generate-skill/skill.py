@@ -27,7 +27,7 @@ from py_mono.skill.prompts import build_skill_md_prompt, build_skill_py_prompt
 from py_mono.skill.validator import validate_skill_md, validate_skill_py
 
 logger = logging.getLogger(__name__)
-
+logging.getLogger().setLevel(logging.INFO)
 MAX_RETRIES = 1  # one retry on skill.py validation failure
 
 
@@ -238,12 +238,13 @@ class GenerateSkill(Skill):
                 return None
 
             text = text.strip()
+            logger.info("LLM returned empty response")
 
             # 🔥 Strip <thinking> tags immediately
             text = self._strip_thinking(text)
             text = _strip_markdown_fences(text)            
-            logger.error(f"llm text stripped{text}")
-            print(text)
+            logger.info(f"in _call_llm text stripped think and markdown{text}")
+            #print(text)
 
             return text
 
@@ -272,10 +273,15 @@ class GenerateSkill(Skill):
 
         retry_reason = ""
         warnings = []
+        code=""
+        prev_code=""
+
 
         for attempt in range(MAX_RETRIES + 1):
             if attempt > 0:
                 print(f"🔄 Retrying skill.py generation (attempt {attempt + 1})...")
+            
+            prev_code=code    
 
             code = self._call_llm(
                 context=context,
@@ -285,6 +291,7 @@ class GenerateSkill(Skill):
                     skill_md_content=skill_md_content,
                     available_tools=available_tools,
                     retry_reason=retry_reason,
+                    prev_code=prev_code,
                 ),
             )
 
@@ -351,7 +358,7 @@ class GenerateSkill(Skill):
         return None, SkillPyValidationResult(valid=False), warnings
     def _normalize_code(self, code: str) -> str:
         from py_mono.skill.validator import _strip_markdown_fences
-
+        
         code = self._strip_thinking(code)
         code = _strip_markdown_fences(code)
         return code.strip()

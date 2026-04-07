@@ -214,3 +214,4 @@ dynamic_tools/*
 # Keep folder structure but ignore contents
 !workspace/.gitkeep
 !dynamic_tools/.gitkeep
+skills/*/skill_debug_*.txt
