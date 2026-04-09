@@ -179,6 +179,131 @@ These demonstrate that:
 
    - Change `status: proposed` → `status: approved` in `SKILL.md`.  
    - The agent can then execute it via `/skill <skill_name> ...`.
+
+
+
+## Skill Model Clarification (Execution vs Reasoning) 
+# Dated 20260407. 
+# My current Understanding.
+
+### Important distinction
+
+The term “skill” is overloaded across different agent systems.
+
+In frameworks such as those described by Anthropic (Claude), a *skill* refers to a **prompt-based reasoning aid**:
+
+* A Markdown document
+* Interpreted dynamically by the LLM
+* Used to guide *how the model thinks*
+
+In contrast, in `py-coding-agent`, a *skill* refers to:
+
+> A **deterministic, executable workflow implemented in Python and gated by approval**
+
+This means:
+
+* Our skills are **not prompt-driven behaviors**
+* They are **reviewable, testable code units**
+* They operate at the **execution layer**, not the reasoning layer
+
+---
+
+### Two-layer model (adopted)
+
+To avoid confusion and improve capability, the system adopts a **dual-layer architecture**:
+
+#### 1. Reasoning Layer (LLM-native)
+
+* Format: Markdown (playbooks, heuristics, strategies)
+* Interpreted by: the LLM
+* Purpose: improve decision-making and problem-solving
+* Examples:
+
+  * Debugging strategies
+  * Refactoring heuristics
+  * Test-writing guidelines
+
+These are **not gated** and **not executable**.
+
+#### 2. Execution Layer (Skills)
+
+* Format:
+
+  * `SKILL.md` (spec)
+  * `skill.py` (implementation)
+* Interpreted by: the runtime system
+* Purpose: perform concrete, deterministic actions
+* Examples:
+
+  * `bug_fix`
+  * `refactor_extract_function`
+
+These are:
+
+* **Gated by approval**
+* **Tool-using**
+* **Deterministic**
+
+---
+
+### Terminology update
+
+To reduce ambiguity:
+
+| Old term | New term (preferred)     |
+| -------- | ------------------------ |
+| Skill    | Execution Skill          |
+| SKILL.md | Execution Spec           |
+| skill.py | Execution Implementation |
+
+“Skill” may still be used informally, but in architecture discussions:
+
+* “Execution Skill” = Python-backed workflow
+* “Reasoning Skill” (or Playbook) = Markdown guidance
+
+---
+
+### Execution vs Reasoning responsibilities
+
+| Responsibility                          | Layer           |
+| --------------------------------------- | --------------- |
+| Deciding what to do                     | Reasoning Layer |
+| Deciding how to do it (algorithmically) | Reasoning Layer |
+| Performing file edits, running tools    | Execution Layer |
+| Producing deterministic outputs         | Execution Layer |
+
+---
+
+### Future direction: automatic skill selection
+
+Currently, execution skills are invoked explicitly:
+
+```
+/skill bug_fix ...
 ```
 
+Planned evolution:
 
+* The LLM will:
+
+  1. Analyze the request
+  2. Select an appropriate execution skill
+  3. Invoke it automatically
+
+This introduces an **orchestration step** between reasoning and execution.
+
+---
+
+### Architectural summary
+
+The system should be understood as:
+
+1. **Reasoning Layer (LLM cognition)**
+2. **Orchestration Layer (skill selection)**
+3. **Execution Layer (approved Python skills)**
+
+This separation aligns with modern agent architectures while preserving:
+
+* Determinism
+* Safety
+* Reviewability
