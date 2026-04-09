@@ -12,68 +12,6 @@ See ADR-011 for design details.
 """
 
 from typing import Dict, Any
-
-# ---------------------------------------------------------------------------
-# Example skill — injected into skill.py prompt as a reference implementation
-# ---------------------------------------------------------------------------
-
-EXAMPLE_SKILL = '''from py_mono.skill.base import Skill, SkillContext
-
-class ListFilesSkill(Skill):
-
-    def name(self) -> str:
-        return "list-files-example"
-
-    def description(self) -> str:
-        return "List all files in the workspace"
-
-    def run(self, request: str, context: SkillContext) -> str:
-        try:
-            workspace = context.workspace_root
-            files = sorted(workspace.rglob("*"))
-            if not files:
-                return "No files found in workspace."
-            lines = [f"Files in {workspace}:\\n"]
-            for f in files:
-                if f.is_file():
-                    rel = f.relative_to(workspace)
-                    lines.append(f"  {rel}")
-            lines.append(f"\\nTotal: {len([f for f in files if f.is_file()])} file(s)")
-            return "\\n".join(lines)
-        except Exception as e:
-            return f"[list-files-example] Error: {e}"
-'''
-
-# ---------------------------------------------------------------------------
-# Skill base class signature — injected into skill.py prompt
-# ---------------------------------------------------------------------------
-
-SKILL_BASE_SIGNATURE = '''from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Any, Dict
-
-class SkillContext:
-    workspace_root: Path          # sandboxed workspace — use for all file ops
-    agent_tools: Dict[str, Any]   # tool_name → Tool (call via tool.run(**kwargs))
-    session_manager: Any          # active LLM provider session
-
-class Skill(ABC):
-    @abstractmethod
-    def name(self) -> str:
-        """Return the unique skill name matching the folder name."""
-        ...
-
-    @abstractmethod
-    def description(self) -> str:
-        """Return a one-line description."""
-        ...
-
-    @abstractmethod
-    def run(self, request: str, context: SkillContext) -> str:
-        """Execute the skill. Always return a string."""
-        ...
-'''
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -157,6 +95,8 @@ Rules:
 - Keep it concise and human-readable
 """
 
+
+
 def build_skill_py_prompt(
     skill_name: str,
     description: str,
@@ -167,101 +107,147 @@ def build_skill_py_prompt(
 ) -> str:
     tool_lines = _format_tool_signatures(available_tools)
 
+    class_name = "".join(w.capitalize() for w in skill_name.split("-")) + "Skill"
+
     retry_block = ""
     if retry_reason:
         retry_reason_escaped = _escape_for_fstring(retry_reason)
         prev_code_escaped = _escape_for_fstring(prev_code)
-        retry_block = f"""IMPORTANT — YOUR PREVIOUS ATTEMPT FAILED VALIDATION:
+        retry_block = f"""
+IMPORTANT — YOUR PREVIOUS ATTEMPT FAILED VALIDATION:
 {retry_reason_escaped}
-Fix ALL of these issues in your new attempt.
-This was your previous attempt:
+
+Fix ALL issues.
+
+Previous attempt:
 {prev_code_escaped}
 """
 
     return f"""You are generating a skill.py file for a Python coding agent skill.
 
 Output ONLY valid Python code.
-Do NOT include markdown code fences (no ``` or ```python.).
-Do NOT include any explanation or preamble.
-Do NOT include any text before or after the Python code.
-Python code should start with import and end with return.
+NO markdown.
+NO explanation.
+NO extra text.
+The file MUST start with imports.
+
+--------------------------------
+REQUIRED IMPORT BLOCK (EXACT)
+--------------------------------
+from py_mono.skill.base import Skill, SkillContext
+import logging
+import re
+from pathlib import Path
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+--------------------------------
+SKILL DEFINITION
+--------------------------------
 Skill name: {skill_name}
+Class name: {class_name}
 Description: {description}
 
-SKILL.md (defines what this skill is allowed to do):
+The class MUST:
+- Be named exactly: {class_name}
+- Subclass: Skill
+- Implement: name(), description(), run()
+
+name() MUST return EXACTLY:
+"{skill_name}"
+
+--------------------------------
+SKILL.md (SOURCE OF TRUTH)
+--------------------------------
 {skill_md_content}
 
-BASE CLASS SIGNATURES (you must subclass Skill exactly):
-{SKILL_BASE_SIGNATURE}
-
-AVAILABLE TOOLS (retrieve via context.agent_tools, execute via tool.run(...))::
-
+--------------------------------
+AVAILABLE TOOLS
+--------------------------------
 {tool_lines}
 
-IMPORTANT:
-- ALWAYS retrieve tools using context.agent_tools.get(...)
-- ALWAYS execute tools using tool.run(...)
+--------------------------------
+TOOL USAGE RULES (STRICT)
+--------------------------------
+- ALWAYS use: context.agent_tools.get("tool_name")
+- ALWAYS call: tool.run(**kwargs)
 - NEVER use tool.func(...)
-
-HOW TO CALL A TOOL:
-    tool = context.agent_tools.get("shell")
-    if not tool:
-        return "Error: shell tool not available"
-
-    result = tool.run(command=\"ls -la\")
-
-    CRITICAL TOOL CALLING RULES:
-- ALWAYS pass arguments as keyword arguments
-- NEVER pass a dictionary as a positional argument
+- NEVER pass positional args
 
 CORRECT:
-    tool.run(command=\"ls -la\")
+    tool.run(command="ls -la")
 
 WRONG:
-    tool.run(\"ls -la\")
-    tool.run({{\"command\": \"ls -la\"}})
+    tool.run("ls -la")
+    tool.run({{"command": "ls -la"}})
 
-HOW TO USE WORKSPACE:
-    workspace = context.workspace_root  # Path object
-    files = list(workspace.rglob("*.py"))
-    content = (workspace / "myfile.txt").read_text()
+--------------------------------
+WORKSPACE USAGE
+--------------------------------
+workspace = context.workspace_root
+files = list(workspace.rglob("*.py"))
+content = (workspace / "file.txt").read_text()
 
-SAFETY RULES — violations will cause HARD FAIL:
-- NEVER use os.system()
-- NEVER use subprocess directly (use shell tool via context.agent_tools)
-- NEVER use exec() or eval()
-- NEVER use __import__()
-- NEVER open files with absolute paths outside workspace
-- NEVER make network calls directly (use MCP tools if available)
-- ALWAYS catch exceptions and return error strings
-- ALWAYS return a string from run()
+--------------------------------
+SAFETY RULES (HARD FAIL)
+--------------------------------
+- NO os.system
+- NO subprocess
+- NO exec / eval
+- NO __import__
+- NO network calls
+- NO absolute paths outside workspace
 
-ALLOWED IMPORTS:
-- py_mono.skill.base (Skill, SkillContext)
-- pathlib, typing, json, re, csv, os.path (read-only)
+--------------------------------
+ALLOWED IMPORTS
+--------------------------------
+- pathlib, typing, json, re, csv
 - datetime, collections, itertools, functools
-- Any tool from context.agent_tools
+- logging
 
-FORBIDDEN IMPORTS:
+--------------------------------
+FORBIDDEN IMPORTS
+--------------------------------
 - os (except os.path)
 - subprocess
-- requests, httpx, urllib (no direct network)
+- requests / httpx / urllib
 - socket
+- abc
 
-WORKING EXAMPLE SKILL (follow this pattern):
-{EXAMPLE_SKILL}
+--------------------------------
+REQUIREMENTS
+--------------------------------
+- MUST catch exceptions
+- MUST return string from run()
+- MUST be deterministic
+- MUST be concise
 
-Now generate skill.py for skill named '{skill_name}'.
-Description: {description}
-The class name should be: {''.join(w.capitalize() for w in skill_name.split('-'))}Skill
-The name() method must return exactly: "{skill_name}"
+--------------------------------
+OUTPUT FORMAT (STRICT)
+--------------------------------
+- Start with imports
+- Then class definition
+- NO extra text before or after
+- NO markdown fences
 
-CRITICAL:
-Your response will be parsed programmatically.
-Do NOT include <thinking> <think> or any hidden reasoning.
-Any output outside the requested format will be discarded.
-MUST import py_mono.skill.base (Skill, SkillContext)
-Do NOT wrap your response in ``` or ```python.
-Your output must be raw Python code only.
+--------------------------------
+EXAMPLE STRUCTURE (FOLLOW THIS)
+--------------------------------
+class {class_name}(Skill):
+
+    def name(self) -> str:
+        return "{skill_name}"
+
+    def description(self) -> str:
+        return "{description}"
+
+    def run(self, request: str, context: SkillContext) -> str:
+        try:
+            # implementation
+            return "result"
+        except Exception as e:
+            return f"[{skill_name}] Error: {{e}}"
+
 {retry_block}
 """

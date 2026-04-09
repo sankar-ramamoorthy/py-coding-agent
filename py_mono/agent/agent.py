@@ -10,7 +10,8 @@ from py_mono.llm.provider_registry import REGISTRY, get_provider
 from py_mono.skill.base import SkillContext, SkillRegistry, SKILLS_DIR
 from py_mono.config import WORKSPACE_ROOT
 from py_mono.skill.approval import run_skill_safe, ApprovalError,wrap_agent_tools 
-
+from py_mono.playbook.playbookregistry import PlaybookRegistry
+from pathlib import Path
 
 class Agent:
     """
@@ -44,6 +45,7 @@ class Agent:
         self.auto_prune_after = auto_prune_after
         self.prune_keep_last = prune_keep_last
         self.skill_registry = skill_registry
+        self.playbook_registry = PlaybookRegistry(root=Path("playbooks"))
 
         # Initialize memory with system prompt only
         self.memory = [
@@ -85,6 +87,8 @@ class Agent:
         if text == "/skill list":
             return True
         if text.startswith("/skill help "):
+            return True
+        if text.startswith("/skill info "):
             return True
         if text.startswith("/skill "):
             return True
@@ -153,7 +157,11 @@ class Agent:
             return self._handle_skill_list()
 
         if text.startswith("/skill help "):
-            skill_name = text[len("/skill help "):].strip()
+            skill_name = text[len("/skill help "):].strip().lower()
+            return self._handle_skill_help(skill_name)
+
+        if text.startswith("/skill info "):
+            skill_name = text[len("/skill info "):].strip().lower()
             return self._handle_skill_help(skill_name)
 
         if text.startswith("/skill "):
@@ -163,7 +171,7 @@ class Agent:
         # Approve command
         # ------------------------------------------------------------------
         if text.startswith("/approve "):
-            skill_name = text[len("/approve "):].strip()
+            skill_name = text[len("/approve "):].strip().lower()
             return self._handle_skill_approve(skill_name)
 
         return ""
@@ -228,10 +236,10 @@ class Agent:
         if len(parts) < 2:
             return "Usage: /skill <name> [args]"
 
-        skill_name = parts[1]
+        skill_name = parts[1].lower()
         skill = self.skill_registry.get(skill_name)
-        print("DEBUG requested:", skill_name)
-        print("DEBUG available:", list(self.skill_registry._skills.keys()))
+        #print("DEBUG requested:", skill_name)
+        #print("DEBUG available:", list(self.skill_registry._skills.keys()))
 
 
         if skill is None:
@@ -253,18 +261,19 @@ class Agent:
         context = SkillContext(
             workspace_root=WORKSPACE_ROOT,
             session_manager=self.session_manager,
-            #agent_tools=self.tools,  # will not call .func() directly
-            agent_tools=wrap_agent_tools(self.tools), 
+            agent_tools=self.tools,  # will not call .func() directly
+            #agent_tools=wrap_agent_tools(self.tools),   #Remove double tool wrapping
         )
 
         try:
             # Safe execution: run_skill_safe enforces approval & forbidden patterns
+            parent = context.calling_skill
             result = run_skill_safe(
                 registry=self.skill_registry,
                 skill_name=skill_name,
                 request=text,
                 context=context,
-                parent_skill=getattr(context, "calling_skill", None),
+                parent_skill=parent,
             )
             return result
 
@@ -335,6 +344,74 @@ class Agent:
             f"Run it with: /skill {skill_name}"
         )
 
+
+    def _format_playbooks_for_prompt(self, playbooks) -> str:
+        if not playbooks:
+            return ""
+
+        sections = []
+        for pb in playbooks:
+            # keep it small to avoid token explosion
+            content = pb.content[:800]
+
+            sections.append(f"## Playbook: {pb.name}\n{content}")
+
+        return "\n\n".join(sections)
+
+    def _try_parse_structured_output(self, text: str) -> Optional[dict]:
+        """
+        Attempt to parse LLM output as JSON (ADR-017).
+        Returns dict if valid, else None.
+        """
+        if not text:
+            return None
+
+        text = text.strip()
+
+        # quick guard
+        if not text.startswith("{"):
+            return None
+
+        try:
+            data = json.loads(text)
+
+            if not isinstance(data, dict):
+                return None
+
+            # STRICT SENTINEL CHECK
+            if data.get("_type") != "agent_action":
+                return None
+                    
+
+            if "action" not in data:
+                return None
+
+            # must include at least one meaningful payload field
+            if not any(k in data for k in ("skill", "arguments", "response")):
+                return None
+        
+            return data
+        except Exception:
+            return None
+
+    def _handle_structured_action(self, data: dict) -> Optional[str]:
+        action = data.get("action")
+
+        if action == "answer":
+            return data.get("arguments") or data.get("response") or ""
+
+        if action == "use_skill":
+            skill_name = data.get("skill")
+            arguments = data.get("arguments", "")
+
+            if not skill_name:
+                return "[ERROR] Missing skill name in structured output"
+
+            # simulate /skill call
+            return self._handle_skill_run(f"/skill {skill_name} {arguments}")
+
+        return None
+    
     # -------------------------
     # Memory / Session Methods
     # -------------------------
@@ -397,8 +474,37 @@ class Agent:
 
             llm = self.session_manager.get_active_provider()
 
+            # 🔥 Retrieve playbooks
+            #playbooks = self.playbook_registry.search(user_input)
+            latest_user_msg = next(
+                (m["content"] for m in reversed(self.memory) if m["role"] == "user"),
+                user_input
+            )
+
+            playbooks = self.playbook_registry.search(latest_user_msg)
+
+
+            # 🔥 Build augmented system prompt
+            base_system = self.memory[0]["content"]
+            playbook_text = self._format_playbooks_for_prompt(playbooks)
+
+            if playbook_text:
+                augmented_system = f"{base_system}\n\nYou may use the following playbooks as guidance:\n\n{playbook_text}"
+            else:
+                augmented_system = base_system
+
+
+            # 🔥 Create temp messages (DO NOT mutate memory)
+            messages = [
+                {
+                    "role": "system",
+                    "content": augmented_system,
+                }
+            ] + self.memory[1:]
+
+
             response = llm.generate(
-                messages=self.memory,
+                messages=messages,#self.memory,
                 tools=list(self.tools.values()),
             )
 
@@ -483,6 +589,36 @@ class Agent:
             # Final answer
             # -------------------------
             if text:
+                # 🔥 Try structured output first
+                structured = self._try_parse_structured_output(text)
+
+                if structured:
+                    self._log("🧠 Structured output detected:", structured)
+
+                    result = self._handle_structured_action(structured)
+
+                    if result:
+                        # treat skill result as assistant response
+                        self.memory.append(
+                            {
+                                "role": "assistant",
+                                "content": result,
+                            }
+                        )
+                        return result
+
+                else:
+                    # 🔍 Debug: JSON-like output that failed validation
+                    if self.debug and text.strip().startswith("{"):
+                        try:
+                            preview = json.loads(text)
+                            self._log("⚠️ Ignored JSON (schema mismatch):", preview)
+                        except Exception:
+                            self._log("⚠️ Invalid JSON (parse error):", text[:200])
+
+
+
+                # fallback: normal text
                 self.memory.append(
                     {
                         "role": "assistant",
@@ -491,6 +627,7 @@ class Agent:
                 )
                 self._log("\n✅ FINAL ANSWER:")
                 return text
+
 
             # -------------------------
             # Fallback

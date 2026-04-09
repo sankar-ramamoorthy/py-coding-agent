@@ -22,8 +22,8 @@ import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 import yaml
-from typing import Any, Dict, List, Optional,TypedDict
-from typing import TYPE_CHECKING
+from typing import Dict, List, Optional, TypedDict, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from py_mono.session.session_manager import SessionManager
     from py_mono.tools.tool import Tool
@@ -33,11 +33,14 @@ logger = logging.getLogger(__name__)
 # Root of the skills directory — sits alongside py_mono/ at project root
 SKILLS_DIR = Path(__file__).parent.parent.parent / "skills"
 
+
 class ListedSkill(TypedDict):
     name: str
     description: str
     status: str
     has_code: bool
+
+
 # ---------------------------------------------------------------------------
 # SkillContext
 # ---------------------------------------------------------------------------
@@ -61,8 +64,11 @@ class SkillContext:
         self.workspace_root = workspace_root
         self.session_manager = session_manager
         self.agent_tools = agent_tools
-        self.calling_skill: Optional[str] = None  # <-- track parent skill
+        self.calling_skill: Optional[str] = None  # track parent skill
 
+    def normalize(self, name: str) -> str:
+        """Canonical normalization for skill names."""
+        return name.strip().lower().replace("-", "_")
 
     def __repr__(self) -> str:
         return (
@@ -76,18 +82,7 @@ class SkillContext:
 # ---------------------------------------------------------------------------
 
 class Skill(ABC):
-    """
-    Abstract base class for all agent skills.
-
-    Subclasses must implement:
-        name()        → unique skill identifier  (e.g. 'bug_fix')
-        description() → one-line description shown in /skill list
-        run()         → execute the skill, return human-readable result
-
-    Optionally override:
-        can_handle()  → return True if this skill should handle the request
-                        (default: matches on skill name prefix)
-    """
+    """Abstract base class for all agent skills."""
 
     @abstractmethod
     def name(self) -> str:
@@ -105,31 +100,22 @@ class Skill(ABC):
         request: str,
         context: SkillContext,
     ) -> str:
-        """
-        Execute the skill.
-
-        Args:
-            request : full user request string (e.g. '/skill bug_fix ...')
-            context : SkillContext with workspace, session, and tools
-
-        Returns:
-            str: human-readable result or error message
-        """
+        """Execute the skill and return human-readable result."""
         ...
 
     def can_handle(self, request: str, context: SkillContext) -> bool:
-        """
-        Return True if this skill can handle the given request.
-        Default: matches if request starts with /skill <name>.
-        Override for more sophisticated matching.
-        """
         text = request.strip()
-        if not text.startswith("/skill "):
+        norm_name = context.normalize(self.name())
+
+        # CLI mode
+        if text.startswith("/skill "):
+            parts = text.split(maxsplit=2)
+            if len(parts) >= 2:
+                return context.normalize(parts[1]) == norm_name
             return False
-        parts = text.split(maxsplit=2)
-        if len(parts) < 2:
-            return False
-        return parts[1].lower() == self.name().lower()
+
+        # Internal mode (future-proof: chaining / orchestration)
+        return context.normalize(text).startswith(norm_name)
 
     def __repr__(self) -> str:
         return f"<Skill name={self.name()}>"
@@ -143,33 +129,29 @@ class SkillRegistry:
     """
     Discovers and manages skills from the skills/ directory.
 
-    Discovery rules:
-    - Scans skills/<skill_name>/SKILL.md for existence (required).
-    - If skills/<skill_name>/skill.py exists and defines a Skill subclass,
-      it is loaded and registered.
-    - Skills with status: proposed in SKILL.md front-matter are NOT executed
-      without explicit approval (dry_run only).
-
-    Usage:
-        registry = SkillRegistry()
-        registry.load()
-        skill = registry.get("bug_fix")
-        result = skill.run(request, context)
+    Canonical rule:
+        ALL skill names are stored internally as lowercase with underscores.
     """
 
     def __init__(self, skills_dir: Path = SKILLS_DIR):
         self.skills_dir = skills_dir
-        self._skills: Dict[str, Skill] = {}
-        self._metadata: Dict[str, dict] = {}   # name → parsed SKILL.md front-matter
+        self._skills: Dict[str, Skill] = {}       # key = normalized name
+        self._metadata: Dict[str, dict] = {}      # key = normalized name
 
+    # -------------------------
+    # Normalization
+    # -------------------------
+    def _norm(self, name: str) -> str:
+        """Canonical normalization for all skill names."""
+        return name.strip().lower().replace("-", "_")
+
+    # -------------------------
+    # Load / reload
+    # -------------------------
     def load(self) -> None:
-        """
-        Scan skills/ directory and load all valid skills.
-        Called once at agent startup.
-        """
         self._skills.clear()
         self._metadata.clear()
-        print("DEBUG SKILLRegistry load")
+
         if not self.skills_dir.exists():
             logger.warning(f"Skills directory not found: {self.skills_dir}")
             return
@@ -185,75 +167,67 @@ class SkillRegistry:
                 logger.debug(f"Skipping {skill_dir.name} — no SKILL.md found")
                 continue
 
-            # Parse SKILL.md front-matter for metadata
             meta = self._parse_skill_md(skill_md)
-            skill_name = meta.get("name", skill_dir.name)
-            self._metadata[skill_name] = meta
+            raw_name = meta.get("name", skill_dir.name)
+            name = self._norm(raw_name)
+            meta["name"] = name
+            self._metadata[name] = meta
 
-            # Load skill.py if present
             if skill_py.exists():
-                skill = self._load_skill_py(skill_py, skill_name)
+                skill = self._load_skill_py(skill_py, name)
                 if skill:
-                    self._skills[skill.name()] = skill
-                    status = meta.get("status", "proposed")
-                    logger.info(
-                        f"✅ Loaded skill '{skill.name()}' "
-                        f"(status={status})"
-                    )
+                    self._skills[name] = skill
+                    logger.info(f"✅ Loaded skill '{name}' (status={meta.get('status','proposed')})")
             else:
-                logger.info(
-                    f"📋 Discovered skill spec '{skill_name}' "
-                    f"(SKILL.md only, no skill.py)"
-                )
+                logger.info(f"📋 Discovered skill spec '{name}' (SKILL.md only)")
 
-    # inside SkillRegistry class
     def reload_skill(self, skill_name: str) -> bool:
-        """
-        Reload a single skill from disk (SKILL.md + optional skill.py).
-        Returns True if skill was successfully reloaded, False otherwise.
-        """
-        skill_dir = self.skills_dir / skill_name
+        name = self._norm(skill_name)
+        skill_dir = self.skills_dir / name
         skill_md = skill_dir / "SKILL.md"
         skill_py = skill_dir / "skill.py"
 
         if not skill_md.exists():
-            logger.warning(f"Cannot reload '{skill_name}' — SKILL.md missing")
+            logger.warning(f"Cannot reload '{name}' — SKILL.md missing")
             return False
 
-        # Parse front-matter
         meta = self._parse_skill_md(skill_md)
-        self._metadata[skill_name] = meta
+        meta["name"] = name
+        self._metadata[name] = meta
 
-        # Load skill.py if exists
         if skill_py.exists():
-            skill = self._load_skill_py(skill_py, skill_name)
+            skill = self._load_skill_py(skill_py, name)
             if skill:
-                self._skills[skill_name] = skill
-                logger.info(f"🔄 Reloaded skill '{skill_name}' (code + metadata)")
+                self._skills[name] = skill
+                logger.info(f"🔄 Reloaded skill '{name}'")
                 return True
             else:
-                logger.warning(f"Failed to load skill.py for '{skill_name}'")
-                self._skills.pop(skill_name, None)
+                self._skills.pop(name, None)
+                logger.warning(f"Failed to reload skill '{name}'")
                 return False
         else:
-            # SKILL.md-only skill
-            self._skills.pop(skill_name, None)
-            logger.info(f"🔄 Reloaded skill spec '{skill_name}' (SKILL.md only)")
+            self._skills.pop(name, None)
+            logger.info(f"🔄 Reloaded spec-only skill '{name}'")
             return True
-        
+
+    # -------------------------
+    # Accessors
+    # -------------------------
     def get(self, name: str) -> Optional[Skill]:
-        """Return a skill by name, or None if not found."""
-        print("DEBUG self._skills",self._skills)
+        return self._skills.get(self._norm(name))
+
+    def is_approved(self, name: str) -> bool:
+        meta = self._metadata.get(self._norm(name), {})
+        return meta.get("status", "proposed").lower() == "approved"
+
+    def get_executable(self, name: str) -> Optional[Skill]:
+        name = self._norm(name)
+        if not self.is_approved(name):
+            return None
         return self._skills.get(name)
 
     def list_skills(self) -> List[ListedSkill]:
-        """
-            Return a list of all discovered skills with name, description, status.
-            Includes SKILL.md-only skills (no skill.py).
-        """
         results: List[ListedSkill] = []
-
-        # Skills with Python implementation
         for name, skill in self._skills.items():
             meta = self._metadata.get(name, {})
             results.append({
@@ -262,8 +236,6 @@ class SkillRegistry:
                 "status": meta.get("status", "proposed"),
                 "has_code": True,
             })
-
-        # SKILL.md-only skills (spec exists but no skill.py yet)
         for name, meta in self._metadata.items():
             if name not in self._skills:
                 results.append({
@@ -272,30 +244,24 @@ class SkillRegistry:
                     "status": meta.get("status", "proposed"),
                     "has_code": False,
                 })
-
-        return results #sorted(results, key=lambda x: x["name"])
+        return results
 
     def get_skill_md(self, name: str) -> Optional[str]:
-        """Return the raw SKILL.md content for a skill, or None."""
+        name = self._norm(name)
         skill_dir = self.skills_dir / name
         skill_md = skill_dir / "SKILL.md"
         if skill_md.exists():
             return skill_md.read_text(encoding="utf-8")
         return None
 
-    def is_approved(self, name: str) -> bool:
-        """Return True if the skill is approved for execution."""
-        meta = self._metadata.get(name, {})
-        return meta.get("status", "proposed").lower() == "approved"
-
+    # -------------------------
+    # Helpers
+    # -------------------------
     def _parse_skill_md(self, skill_md: Path) -> dict:
-        """
-        Parse optional YAML front-matter from SKILL.md.
-        """
         try:
             text = skill_md.read_text(encoding="utf-8")
             if not text.startswith("---"):
-                return {"name": skill_md.parent.name}
+                return {"name": self._norm(skill_md.parent.name)}
 
             lines = text.splitlines()
             start = 1
@@ -305,53 +271,32 @@ class SkillRegistry:
                     end = i
                     break
             if end is None:
-                return {"name": skill_md.parent.name}
+                return {"name": self._norm(skill_md.parent.name)}
 
             yaml_text = "\n".join(lines[start:end])
             meta = yaml.safe_load(yaml_text) or {}
-
-            # Fallback name
             if "name" not in meta:
-                meta["name"] = skill_md.parent.name
-
+                meta["name"] = self._norm(skill_md.parent.name)
+            else:
+                meta["name"] = self._norm(str(meta["name"]))
             return meta
-
         except Exception as e:
             logger.warning(f"Could not parse SKILL.md front-matter: {e}")
-        return {"name": skill_md.parent.name}
+            return {"name": self._norm(skill_md.parent.name)}
 
     def _load_skill_py(self, skill_py: Path, skill_name: str) -> Optional[Skill]:
-        """
-        Dynamically import skill.py and find the first Skill subclass.
-        """
         try:
             spec = importlib.util.spec_from_file_location(
                 f"skills.{skill_name}.skill", skill_py
             )
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-
             for attr in vars(module).values():
-                if (
-                    isinstance(attr, type)
-                    and issubclass(attr, Skill)
-                    and attr is not Skill
-                ):
-                    return attr() # assumes no‑args __init__; otherwise pull from meta
-
+                if isinstance(attr, type) and issubclass(attr, Skill) and attr is not Skill:
+                    return attr()
         except Exception as e:
             logger.error(f"Failed to load skill.py for '{skill_name}': {e}")
-
         return None
 
     def __repr__(self) -> str:
         return f"<SkillRegistry skills={list(self._skills.keys())}>"
-    def get_executable(self, name: str) -> Optional[Skill]:
-        """
-        Return a skill if it exists and is approved.
-        Otherwise return None.
-        """
-        if not self.is_approved(name):
-            return None
-        return self.get(name)
-
