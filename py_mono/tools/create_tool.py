@@ -1,18 +1,78 @@
-from py_mono.tools.tool import Tool
+import inspect
 import pathlib
+import re
+
+from py_mono.tools.tool import Tool
 
 TOOLS_DIR = pathlib.Path("dynamic_tools")
+VALID_TOOL_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
 
 def create_tool(name, code):
-    path = TOOLS_DIR / f"{name}.py"
+    if not VALID_TOOL_NAME.fullmatch(name):
+        return "Invalid tool name."
 
-    with open(path, "w") as f:
-        f.write(code)
+    try:
+        TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+        path = (TOOLS_DIR / f"{name}.py").resolve()
 
-    return f"Tool {name} created at {path}"
+        # detect function
+        match = re.search(r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*?)\)", code)
+        if not match:
+            return "Error: no function found."
+
+        func_name = match.group(1)
+        args = match.group(2)
+
+        # 🔥 build parameter schema
+        params = [a.strip().split("=")[0] for a in args.split(",") if a.strip()]
+        properties = {
+            p: {"type": "string"} for p in params
+        }
+
+        required = params
+
+        wrapped_code = f"""
+from py_mono.tools.tool import Tool
+
+{code}
+
+{name}_tool = Tool(
+    name="{name}",
+    description="Auto-generated tool: {name}",
+    func={func_name},
+    parameters={{
+        "type": "object",
+        "properties": {properties},
+        "required": {required},
+    }},
+)
+"""
+
+        path.write_text(wrapped_code, encoding="utf-8")
+
+        return f"✅ Tool '{name}' created with schema."
+
+    except Exception as exc:
+        return f"Error creating tool {name}: {exc}"
+
 
 create_tool_tool = Tool(
     "create_tool",
     "Create a new Python tool dynamically",
-    create_tool
+    create_tool,
+    parameters={
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "Python module name for the tool file to create.",
+            },
+            "code": {
+                "type": "string",
+                "description": "Full Python source code for the tool module.",
+            },
+        },
+        "required": ["name", "code"],
+    },
 )

@@ -1,12 +1,12 @@
 """
-generate-playbook — LLM-powered playbook generator.
+generate_playbook — LLM-powered playbook generator.
 
 Creates a Markdown reasoning playbook using a single LLM call.
 
 Usage:
-    /skill generate-playbook <category> | <description>
+    /skill generate_playbook <category> | <description>
 
-NOTE: generate-playbook only produces a .md playbook file. 
+NOTE: generate_playbook only produces a .md playbook file. 
 No Python code is created by this workflow.    
 """
 
@@ -25,7 +25,7 @@ PLAYBOOKS_DIR = Path(__file__).parent.parent.parent / "playbooks"
 class GeneratePlaybook(Skill):
 
     def name(self) -> str:
-        return "generate-playbook"
+        return "generate_playbook"
 
     def description(self) -> str:
         return "Generate a reasoning playbook (Markdown)"
@@ -78,7 +78,7 @@ class GeneratePlaybook(Skill):
     # ------------------------------------------------------------------
 
     def _parse_request(self, request: str):
-        prefix = "/skill generate-playbook"
+        prefix = "/skill generate_playbook"
         raw = request.strip()
 
         if raw.startswith(prefix):
@@ -87,8 +87,8 @@ class GeneratePlaybook(Skill):
         parts = raw.split("|", 1)
         if len(parts) != 2:
             return (
-                "Usage: /skill generate-playbook <category> | <description>\n"
-                "Example: /skill generate-playbook testing | pytest guide"
+                "Usage: /skill generate_playbook <category> | <description>\n"
+                "Example: /skill generate_playbook testing | pytest guide"
             )
 
         category = parts[0].strip().lower()

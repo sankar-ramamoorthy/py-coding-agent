@@ -115,7 +115,14 @@ def main():
     )
 
     # Create agent
-    agent = Agent(session_manager, tools, skill_registry )
+    agent = Agent(
+        session_manager,
+        tools,
+        skill_registry,
+        dynamic_tool_names={t.name for t in dynamic_tools},
+        dynamic_tools_folder="dynamic_tools",
+        non_dynamic_tools=base_tools + mcp_tools,
+    )
 
     # Start CLI
     start_cli(agent)

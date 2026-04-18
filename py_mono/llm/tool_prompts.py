@@ -1,23 +1,31 @@
 # py_mono/llm/tool_prompts.py
 
 """
-Safe prompt builders for LLM-powered dynamic tools and skill generation.
+Prompt builders for future LLM-assisted tool and skill generation flows.
 
-Escapes curly braces and quotes in user-supplied input to avoid
-Python string formatting errors (like 'Invalid format specifier').
+This module is intentionally kept even though it is not part of the current
+runtime path. Today, dynamic tools are exposed through registered `Tool`
+objects and provider tool schemas, so `create_tool` does not call these
+helpers directly.
+
+Retaining this module documents the intended prompt shape for a future
+implementation where the agent may ask an LLM to scaffold tool code before
+writing it into `dynamic_tools/`.
 """
 
 from typing import Dict
 
+
 def _escape_for_fstring(s: str) -> str:
     """
-    Escape curly braces and double quotes to safely embed in f-strings.
+    Escape braces and double quotes for safe interpolation into prompt text.
     """
     if not isinstance(s, str):
         s = str(s)
-    s = s.replace("{", "{{").replace("}", "}}")   # escape curly braces
-    s = s.replace('"', '\\"')                     # escape double quotes
+    s = s.replace("{", "{{").replace("}", "}}")
+    s = s.replace('"', '\\"')
     return s
+
 
 def build_create_tool_prompt(
     tool_name: str,
@@ -26,23 +34,15 @@ def build_create_tool_prompt(
     instructions: str = "",
 ) -> str:
     """
-    Build a prompt for the LLM to generate a safe, LLM-friendly dynamic tool.
+    Build a prompt for a future LLM-driven tool scaffolding step.
 
-    Args:
-        tool_name: Name of the tool to create
-        description: Short description of the tool's purpose (str, dict, JSON, or list)
-        parameters: Dict of parameters in standard Tool format
-        instructions: Optional extra instructions for the tool logic
-
-    Returns:
-        str: Full prompt text
+    This helper is currently unused at runtime. Keep it aligned with the
+    `Tool` contract so it remains a valid starting point if that flow is added.
     """
-    # Sanitize inputs
     safe_tool_name = _escape_for_fstring(tool_name)
     safe_description = _escape_for_fstring(description)
     safe_instructions = _escape_for_fstring(instructions)
 
-    # Format parameters safely
     param_lines = []
     for param, meta in parameters.get("properties", {}).items():
         type_ = meta.get("type", "any")
@@ -70,7 +70,7 @@ Requirements for the tool code:
 Extra instructions (optional):
 {safe_instructions}
 
-Please output **only valid Python code** that defines the tool.
+Please output only valid Python code that defines the tool.
 """
 
     return prompt.strip()

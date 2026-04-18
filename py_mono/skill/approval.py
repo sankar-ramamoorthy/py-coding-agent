@@ -1,6 +1,8 @@
 # py_mono/skill/approval.py
 
+from collections.abc import Mapping
 from typing import Optional, Dict
+
 from py_mono.skill.base import SkillRegistry, SkillContext, Skill
 
 
@@ -11,26 +13,75 @@ class ApprovalError(Exception):
 
 class SafeToolWrapper:
     """
-    Wraps a Tool object to forbid direct .func() access.
-    Must call via tool.run({...}) instead.
+    Wrap a Tool object to forbid direct .func() access.
+
+    Skills must call tools via tool.run(**kwargs).
     """
 
-    def __init__(self, tool: 'Tool'):
+    def __init__(self, tool: "Tool"):
         self._tool = tool
 
     def __getattr__(self, name):
         if name == "func":
             raise RuntimeError(
-                "Direct tool.func() usage is forbidden — use tool.run({...})"
+                "Direct tool.func() usage is forbidden - use tool.run(**kwargs)"
             )
         return getattr(self._tool, name)
 
 
-def wrap_agent_tools(agent_tools: Dict[str, 'Tool']) -> Dict[str, 'Tool']:
+class SafeAgentTools(Mapping):
     """
-    Wrap all agent tools to enforce forbidden pattern rule.
+    Read-only tool mapping that enforces per-skill allowed_tools policy.
+
+    A skill is only blocked when it actually tries to access a disallowed tool.
+    Merely having other tools loaded in the agent must not block execution.
     """
-    return {name: SafeToolWrapper(tool) for name, tool in agent_tools.items()}
+
+    def __init__(
+        self,
+        agent_tools: Dict[str, "Tool"],
+        allowed_tools: set[str],
+        skill_name: str,
+    ):
+        self._tools = {
+            name: SafeToolWrapper(tool) for name, tool in agent_tools.items()
+        }
+        self._allowed_tools = allowed_tools
+        self._skill_name = skill_name
+
+    def _ensure_allowed(self, tool_name: str) -> None:
+        if tool_name not in self._allowed_tools:
+            raise ApprovalError(
+                f"Skill '{self._skill_name}' is not allowed to use the tool '{tool_name}'"
+            )
+
+    def __getitem__(self, tool_name: str):
+        self._ensure_allowed(tool_name)
+        return self._tools[tool_name]
+
+    def get(self, tool_name: str, default=None):
+        if tool_name not in self._tools:
+            return default
+        self._ensure_allowed(tool_name)
+        return self._tools[tool_name]
+
+    def __iter__(self):
+        return iter(self._tools)
+
+    def __len__(self) -> int:
+        return len(self._tools)
+
+
+def wrap_agent_tools(
+    agent_tools: Dict[str, "Tool"],
+    allowed_tools: set[str],
+    skill_name: str,
+) -> Mapping[str, "Tool"]:
+    """
+    Wrap agent tools to enforce both forbidden direct access and allowed_tools.
+    """
+
+    return SafeAgentTools(agent_tools, allowed_tools, skill_name)
 
 
 def run_skill_safe(
@@ -55,9 +106,6 @@ def run_skill_safe(
         RuntimeError: if forbidden patterns are used
     """
 
-    # ------------------------------------------------------------------
-    # Canonical normalization using registry
-    # ------------------------------------------------------------------
     skill_name = registry._norm(skill_name)
     if parent_skill:
         parent_skill = registry._norm(parent_skill)
@@ -66,16 +114,10 @@ def run_skill_safe(
     if not skill:
         raise ApprovalError(f"Skill '{skill_name}' not found.")
 
-    # ------------------------------------------------------------------
-    # Metadata lookup
-    # ------------------------------------------------------------------
     meta = registry._metadata.get(skill_name, {})
     status = meta.get("status", "proposed").lower()
     trusted = meta.get("trusted", False)
 
-    # ------------------------------------------------------------------
-    # Approval enforcement
-    # ------------------------------------------------------------------
     if status != "approved" and not trusted:
         raise ApprovalError(f"Skill '{skill_name}' is not approved for execution.")
 
@@ -88,30 +130,15 @@ def run_skill_safe(
     if skill_name == "approval" and parent_skill:
         raise ApprovalError("Approval skill cannot be called from another skill.")
 
-    # ------------------------------------------------------------------
-    # Safe context: wrap tools + track calling skill
-    # ------------------------------------------------------------------
+    allowed_tools = set(meta.get("allowed_tools", list(context.agent_tools.keys())))
+
     safe_context = SkillContext(
         workspace_root=context.workspace_root,
-        agent_tools=wrap_agent_tools(context.agent_tools),
+        agent_tools=wrap_agent_tools(context.agent_tools, allowed_tools, skill_name),
         session_manager=context.session_manager,
     )
     safe_context.calling_skill = skill_name
 
-    # ------------------------------------------------------------------
-    # Enforce per-skill allowed tools
-    # ------------------------------------------------------------------
-    allowed_tools = meta.get("allowed_tools", list(safe_context.agent_tools.keys()))
-    for tool_name in safe_context.agent_tools:
-        if tool_name not in allowed_tools:
-            raise ApprovalError(
-                f"Skill '{skill_name}' is not allowed to use the tool '{tool_name}'"
-            )
-        
-
-    # ------------------------------------------------------------------
-    # Execute skill
-    # ------------------------------------------------------------------
     try:
         result = skill.run(request, safe_context)
     except Exception as e:
