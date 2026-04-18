@@ -1,0 +1,128 @@
+from pathlib import Path
+
+import pytest
+
+from py_mono.skill.approval import ApprovalError, run_skill_safe
+from py_mono.skill.base import Skill, SkillContext
+from py_mono.tools.tool import Tool
+
+
+class StubRegistry:
+    def __init__(self, skill, metadata):
+        self._skill = skill
+        self._metadata = metadata
+
+    def _norm(self, name: str) -> str:
+        return name.strip().lower().replace("-", "_")
+
+    def get(self, name: str):
+        if self._norm(name) == self._norm(self._skill.name()):
+            return self._skill
+        return None
+
+
+class UsesAllowedToolSkill(Skill):
+    def name(self) -> str:
+        return "allowed_only"
+
+    def description(self) -> str:
+        return "uses only allowed tool"
+
+    def run(self, request: str, context: SkillContext) -> str:
+        return context.agent_tools["list_files"].run(path=".")
+
+
+class UsesBlockedToolSkill(Skill):
+    def name(self) -> str:
+        return "blocked_tool"
+
+    def description(self) -> str:
+        return "tries to use blocked tool"
+
+    def run(self, request: str, context: SkillContext) -> str:
+        return context.agent_tools["read_file"].run(path="x.py")
+
+
+class DirectFuncSkill(Skill):
+    def name(self) -> str:
+        return "direct_func"
+
+    def description(self) -> str:
+        return "tries to use tool.func directly"
+
+    def run(self, request: str, context: SkillContext) -> str:
+        tool = context.agent_tools["list_files"]
+        return tool.func(path=".")
+
+
+def make_context():
+    tools = {
+        "list_files": Tool("list_files", "list files", lambda path=".": "ok"),
+        "read_file": Tool("read_file", "read file", lambda path=".": "data"),
+    }
+    return SkillContext(workspace_root=Path("."), agent_tools=tools, session_manager=None)
+
+
+def test_allowed_tools_only_checked_on_actual_access():
+    skill = UsesAllowedToolSkill()
+    registry = StubRegistry(
+        skill,
+        {
+            "allowed_only": {
+                "status": "approved",
+                "allowed_tools": ["list_files"],
+            }
+        },
+    )
+
+    result = run_skill_safe(registry, "allowed_only", "/skill allowed_only", make_context())
+
+    assert result == "ok"
+
+
+def test_disallowed_tool_access_is_blocked_when_used():
+    skill = UsesBlockedToolSkill()
+    registry = StubRegistry(
+        skill,
+        {
+            "blocked_tool": {
+                "status": "approved",
+                "allowed_tools": ["list_files"],
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="not allowed to use the tool 'read_file'"):
+        run_skill_safe(registry, "blocked_tool", "/skill blocked_tool", make_context())
+
+
+def test_direct_tool_func_access_is_forbidden():
+    skill = DirectFuncSkill()
+    registry = StubRegistry(
+        skill,
+        {
+            "direct_func": {
+                "status": "approved",
+                "allowed_tools": ["list_files"],
+            }
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="Direct tool.func\\(\\) usage is forbidden"):
+        run_skill_safe(registry, "direct_func", "/skill direct_func", make_context())
+
+
+def test_unapproved_skill_is_still_blocked():
+    skill = UsesAllowedToolSkill()
+    registry = StubRegistry(
+        skill,
+        {
+            "allowed_only": {
+                "status": "proposed",
+                "allowed_tools": ["list_files"],
+            }
+        },
+    )
+
+    with pytest.raises(ApprovalError, match="is not approved for execution"):
+        run_skill_safe(registry, "allowed_only", "/skill allowed_only", make_context())

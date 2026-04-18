@@ -11,6 +11,7 @@ from py_mono.skill.base import SkillContext, SkillRegistry, SKILLS_DIR
 from py_mono.config import WORKSPACE_ROOT
 from py_mono.skill.approval import run_skill_safe, ApprovalError,wrap_agent_tools 
 from py_mono.playbook.playbookregistry import PlaybookRegistry
+from py_mono.tools.tool_loader import load_dynamic_tools
 from pathlib import Path
 
 class Agent:
@@ -37,14 +38,24 @@ class Agent:
         debug: bool = True,
         auto_prune_after: int = 5,
         prune_keep_last: int = 20,
+        dynamic_tool_names: Optional[set[str]] = None,
+        dynamic_tools_folder: str = "dynamic_tools",
+        non_dynamic_tools: Optional[List[Any]] = None,
     ):
         self.session_manager = session_manager
-        self.tools = {t.name: t for t in tools}
         self.max_steps = max_steps
         self.debug = debug
         self.auto_prune_after = auto_prune_after
         self.prune_keep_last = prune_keep_last
         self.skill_registry = skill_registry
+        self.dynamic_tool_names = set(dynamic_tool_names or set())
+        self.dynamic_tools_folder = dynamic_tools_folder
+        if non_dynamic_tools is None:
+            non_dynamic_tools = [
+                tool for tool in tools if tool.name not in self.dynamic_tool_names
+            ]
+        self.non_dynamic_tools = {tool.name: tool for tool in non_dynamic_tools}
+        self.tools = {tool.name: tool for tool in tools}
         self.playbook_registry = PlaybookRegistry(root=Path("playbooks"))
 
         # Initialize memory with system prompt only
@@ -80,7 +91,7 @@ class Agent:
 
     def _is_special_command(self, text: str) -> bool:
         text = text.strip()
-        if text in ("/clear", "/bye", "/providers"):
+        if text in ("/clear", "/bye", "/providers", "/reload_tools"):
             return True
         if text.startswith("/provider "):
             return True
@@ -93,6 +104,8 @@ class Agent:
         if text.startswith("/skill "):
             return True
         if text.startswith("/approve "):
+            return True
+        if text.startswith("/reload_skill "):
             return True
         return False
 
@@ -118,6 +131,9 @@ class Agent:
                 f"Active model: {model}\n"
                 f"Available providers: {available}"
             )
+
+        if text == "/reload_tools":
+            return self._reload_dynamic_tools()
 
         if text.startswith("/provider "):
             parts = text.split(maxsplit=2)
@@ -174,7 +190,48 @@ class Agent:
             skill_name = text[len("/approve "):].strip().lower()
             return self._handle_skill_approve(skill_name)
 
+        if text.startswith("/reload_skill"):
+            parts = text.split(maxsplit=1)
+            if len(parts) < 2:
+                #print("Usage: /reload_skill <skill_name>")
+                return "Usage: /reload_skill <skill_name>"
+
+            skill_name = parts[1].strip()
+            ok = self.skill_registry.reload_skill(skill_name)
+
+            if ok:
+                print(f"🔄 Reloaded skill '{skill_name}'")
+            else:
+                print(f"❌ Failed to reload skill '{skill_name}'")
+            
+
+
         return ""
+
+    def _reload_dynamic_tools(self) -> str:
+        dynamic_tools = load_dynamic_tools(self.dynamic_tools_folder)
+        new_dynamic_names = {tool.name for tool in dynamic_tools}
+        removed_names = sorted(self.dynamic_tool_names - new_dynamic_names)
+
+        self.tools = dict(self.non_dynamic_tools)
+        for tool in dynamic_tools:
+            self.tools[tool.name] = tool
+
+        self.dynamic_tool_names = new_dynamic_names
+
+        loaded_names = sorted(new_dynamic_names)
+        if loaded_names:
+            message = (
+                f"Reloaded {len(loaded_names)} dynamic tool(s): "
+                f"{', '.join(loaded_names)}"
+            )
+        else:
+            message = "Reloaded 0 dynamic tools."
+
+        if removed_names:
+            message += f"\nRemoved stale dynamic tool(s): {', '.join(removed_names)}"
+
+        return message
 
     # -------------------------
     # Skill handlers
@@ -237,6 +294,11 @@ class Agent:
             return "Usage: /skill <name> [args]"
 
         skill_name = parts[1].lower()
+        reloaded = self.skill_registry.reload_skill(skill_name)
+        if not reloaded:
+            # optional: warn but continue
+            print(f"[SKILL] Warning: reload failed for '{skill_name}', using cached version")
+                    
         skill = self.skill_registry.get(skill_name)
         #print("DEBUG requested:", skill_name)
         #print("DEBUG available:", list(self.skill_registry._skills.keys()))

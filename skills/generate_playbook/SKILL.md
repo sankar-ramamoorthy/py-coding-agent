@@ -1,21 +1,25 @@
 ---
-name: generate-playbook
+name: generate_playbook
 description: Generate a new reasoning playbook (Markdown) using the LLM
 status: approved
-allowed_tools: [read-file,write-file]
+allowed_tools:
+  - list_files
+  - read_file
+  - write_file
+  - edit_file
 constraints: write-only, playbooks directory only, no code execution
 ---
 
-# generate-playbook
+# generate_playbook
 
 Creates a Markdown playbook that guides reasoning (not execution).
 
 ## Usage
 
-/skill generate-playbook <category> | <description>
+/skill generate_playbook <category> | <description>
 
 Example:
-/skill generate-playbook testing | Guide for writing pytest test suites
+/skill generate_playbook testing | Guide for writing pytest test suites
 
 ## Expected Output
 
