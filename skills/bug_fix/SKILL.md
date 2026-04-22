@@ -1,17 +1,18 @@
 ---
 name: bug_fix
-description: Fix a bug from a stack trace or error message.
-trigger: /skill bug_fix <error> file:<path> [line:<num>]
+description: Fix a bug from stack trace. Applies minimal patch and verifies with regression test.
+trigger: /skill bug_fix <error> file:<path> [line:<num>] [dry_run:<true|false>]
 allowed_tools:
-  - read_file
-  - write_file
-  - shell
-  - edit_file
-  - list_files
+    - read_file
+    - write_file
+    - shell
+    - edit_file
+    - list_files
 constraints:
-  - No file deletion.
-  - No new dependencies.
-  - No editing of .env or key files without explicit approval.
+    - No file deletion.
+    - No new dependencies.
+    - No editing of.env or key files without explicit approval.
+    - Must run pytest and pass before completing. Rollback on failure.
 status: approved
 ---
 # bug_fix

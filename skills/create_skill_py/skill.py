@@ -22,14 +22,16 @@ class CreateSkillPy(Skill):
     # Entry
     # ------------------------------------------------------------------
     def run(self, request: str, context: SkillContext) -> str:
-
         parsed = self._parse_request(request)
         if isinstance(parsed, str):
             return parsed
 
-        skill_name, overwrite, force_llm = parsed
+        skill_name, overwrite, force_llm, dry_run = parsed
 
-        skill_path = SKILLS_DIR / skill_name
+        skill_path = (SKILLS_DIR / skill_name).resolve()
+        if not str(skill_path).startswith(str(SKILLS_DIR.resolve())):
+            return f"❌ Invalid skill path. Must be under {SKILLS_DIR}"
+
         md_path = skill_path / "SKILL.md"
         py_path = skill_path / "skill.py"
 
@@ -48,68 +50,62 @@ class CreateSkillPy(Skill):
         content = md_path.read_text(encoding="utf-8")
 
         metadata = self._extract_yaml(content)
-        if metadata is None:
-            return "❌ Failed to parse YAML frontmatter"
+        if isinstance(metadata, str):  # error message
+            return metadata
 
         execution_mode = metadata.get("execution_mode", "deterministic")
-        if execution_mode not in {"deterministic", "llm", "hybrid"}:
-            return f"❌ Invalid execution_mode '{execution_mode}'"
-
-        # CLI override
         if force_llm:
             execution_mode = "hybrid"
 
         skill_name_md = metadata.get("name", skill_name)
         description = metadata.get("description", "Generated skill")
         allowed_tools = metadata.get("allowed_tools", [])
-
         expected_logic = self._extract_section(content, "Expected Logic")
 
         # --------------------------------------------------------------
-        # Deterministic scaffold
+        # Generate code
         # --------------------------------------------------------------
-        code = self._build_scaffold(
-            skill_name_md,
-            description,
-            allowed_tools,
-            expected_logic,
-        )
+        code = self._build_scaffold(skill_name_md, description, allowed_tools, expected_logic)
 
-        # --------------------------------------------------------------
-        # Execution modes
-        # --------------------------------------------------------------
         if execution_mode == "llm":
-            print(f"🤖 Generating via LLM for '{skill_name}'...")
+            logger.info(f"🤖 Generating via LLM for '{skill_name}'...")
             generated = self._call_llm(context, content, code)
             if generated:
                 code = generated
 
         elif execution_mode == "hybrid":
-            print(f"🤖 Enhancing via LLM for '{skill_name}'...")
+            logger.info(f"🤖 Enhancing via LLM for '{skill_name}'...")
             enhanced = self._call_llm(context, content, code)
             if enhanced:
                 code = enhanced
 
-        # deterministic → do nothing
-
-        # --------------------------------------------------------------
-        # Normalize + validate
-        # --------------------------------------------------------------
         code = self._normalize_code(code)
-
         result = validate_skill_py(code=code, skill_name=skill_name)
-
         if not result.valid:
+            return f"❌ Generated skill.py failed validation:\n{result.failure_reason()}"
+
+        # --------------------------------------------------------------
+        # Dry run check - THIS IS WHERE IT GOES
+        # --------------------------------------------------------------
+        if dry_run:
             return (
-                f"❌ Generated skill.py failed validation:\n"
-                f"{result.failure_reason()}"
+                f"[DRY RUN] Would create {py_path}\n"
+                f"Mode: {execution_mode}\n\n"
+                "=== Code Preview ===\n"
+                f"{code[:1000]}{'...' if len(code) > 1000 else ''}"
             )
 
         # --------------------------------------------------------------
-        # Save
+        # WRITE LOGIC - HERE IT IS
         # --------------------------------------------------------------
-        skill_path.mkdir(parents=True, exist_ok=True)
-        py_path.write_text(code, encoding="utf-8")
+        skill_path.mkdir(parents=True, exist_ok=True) # ensure dir exists
+        write_file = context.agent_tools.get("write_file")
+        if not write_file:
+            return "[create_skill_py] Tool 'write_file' not found in agent_tools."
+
+        write_result = write_file.func({"path": str(py_path), "content": code})
+        if "Error" in str(write_result):
+            return f"❌ Failed to write skill.py:\n{write_result}"
 
         mode_label = {
             "deterministic": "🧱 Deterministic",
@@ -122,7 +118,6 @@ class CreateSkillPy(Skill):
             f"Location: {py_path}\n"
             f"{mode_label}"
         )
-
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -134,30 +129,42 @@ class CreateSkillPy(Skill):
             raw = raw[len(prefix):].strip()
 
         if not raw:
-            return "Usage: /skill create_skill_py <skill-name> [--overwrite] [--llm]"
+            return "Usage: /skill create_skill_py <skill-name> [--overwrite] [--llm] [--dry_run]"
 
         parts = raw.split()
 
         skill_name = parts[0]
         overwrite = "--overwrite" in parts
         force_llm = "--llm" in parts
+        dry_run = "--dry_run" in parts
 
         if not re.match(r'^[a-z0-9][a-z0-9\-]*$', skill_name):
             return f"❌ Invalid skill name '{skill_name}'"
 
-        return skill_name, overwrite, force_llm
+        return skill_name, overwrite, force_llm , dry_run
 
-    def _extract_yaml(self, content: str) -> Optional[dict]:
+    def _extract_yaml(self, content: str) -> Optional[dict] | str:
         if not content.startswith("---"):
-            return None
+            return "❌ Missing YAML front-matter. Must start with ---"
 
         try:
             _, yaml_block, _ = content.split("---", 2)
             import yaml
-            return yaml.safe_load(yaml_block)
+            data = yaml.safe_load(yaml_block)
         except Exception as e:
-            logger.error(f"YAML parse failed: {e}")
-            return None
+            return f"❌ Invalid YAML syntax: {e}"
+
+        # Validate required fields
+        required = ["name", "description"]
+        missing = [f for f in required if f not in data]
+        if missing:
+            return f"❌ YAML missing required fields: {missing}"
+
+        mode = data.get("execution_mode", "deterministic")
+        if mode not in {"deterministic", "llm", "hybrid"}:
+            return f"❌ Invalid execution_mode '{mode}'. Must be: deterministic|llm|hybrid"
+
+        return data
 
     def _extract_section(self, md: str, section: str) -> str:
         match = re.search(rf"## {section}(.*?)(##|$)", md, re.DOTALL)
