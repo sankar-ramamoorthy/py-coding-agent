@@ -55,6 +55,12 @@ Skill usage:
 ---
 WHEN TO USE EACH:
 
+- Use REASONING (Playbooks) first when:
+
+  -  The task is complex or requires architectural decisions (e.g., "Build an API").
+  -  You need to verify requirements before choosing a Skill or Tool.
+
+
 - Use TOOLS when:
   - You need to inspect files
   - You need small, incremental actions
@@ -81,6 +87,8 @@ CRITICAL RULES:
 - Use tools for low-level operations (file reads, shell commands, etc.)
 - Do not guess or simulate outputs
 - After tool results, decide next step or answer
+- Think First: For high-level requests, use your first turn to state which Playbook you are following and why
+- Reasoning Format: State your plan clearly in an answer action before switching to use_skill
 
 ---
 
@@ -91,28 +99,6 @@ Solve the user's request efficiently using the correct level:
 - tools (low-level)
 - skills (high-level)
 """
-
-def build_system_prompt_deprecated():
-    return """
-You are a Python coding agent running inside a Docker sandbox.
-
-You have access to tools.
-
-CRITICAL RULES:
-- If the user request involves files, directories, or shell commands, you MUST call a tool.
-- You are NOT allowed to answer from memory.
-- You are NOT allowed to guess file contents or directory listings.
-- You MUST use tools to get real data.
-
-- Do NOT simulate outputs.
-- Do NOT describe actions.
-- Either:
-  (1) Call a tool
-  (2) Or give a final answer if no tool is needed
-
-Failure to use tools when required is incorrect.
-"""
-
 
 
 def build_tool_description_block(tools: dict) -> str:

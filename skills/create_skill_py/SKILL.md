@@ -1,137 +1,69 @@
-
----
-
-# 📄 `skills/create_skill_py/SKILL.md`
-
 ---
 name: create_skill_py
-description: Generate a skill.py from an existing SKILL.md using deterministic or LLM-assisted modes.
+description: Generate a skill.py from an existing SKILL.md using deterministic or LLM-assisted modes
+trigger: /skill create_skill_py <skill-name> [--overwrite] [--llm] [--dry_run]
 status: approved
 execution_mode: hybrid
 allowed_tools:
-  - list_files
-  - read_file
-  - write_file
+    - list_files
+    - read_file
+    - write_file
 constraints:
-  - workspace-only
-  - prevents-overwriting: true (unless --overwrite is provided)
+    - workspace-only. Must stay in./skills/<skill-name>/
+    - prevents-overwriting: true (unless --overwrite is provided)
+    - Must validate generated code with validate_skill_py before writing
+    - No network access except LLM provider call
 ---
 
 # create_skill_py
 
-This meta-skill generates a `skill.py` file for an existing skill by reading its `SKILL.md`.
-
-It functions as a compiler:
-
-- `SKILL.md` → specification
-- `skill.py` → executable implementation
-
----
+Meta-skill that compiles `SKILL.md` spec → `skill.py` implementation.
 
 ## Usage
-
-```bash
 /skill create_skill_py <skill-name> [--overwrite] [--llm]
-````
+
 
 ### Arguments
-
-* `<skill-name>`
-  Name of the skill directory inside `./skills/`
+* `<skill-name>`: Directory name under `./skills/`. Must match `^[a-z0-9][a-z0-9-]*$`
 
 ### Flags
-
-* `--overwrite`
-  Overwrite an existing `skill.py`
-
-* `--llm`
-  Force LLM enhancement regardless of `execution_mode`
-
----
+* `--overwrite`: Replace existing `skill.py`
+* `--llm`: Force LLM mode even if YAML says `deterministic`
+* `--dry_run`: Show generated code, don't write file
 
 ## Execution Modes
-
-Defined in YAML frontmatter:
-
-* `deterministic` → generate scaffold only
-* `llm` → full LLM-generated implementation
-* `hybrid` → scaffold + LLM enhancement (default)
-
----
+From SKILL.md YAML `execution_mode`:
+* `deterministic`: Scaffold only. Fast, predictable.
+* `llm`: Full LLM generation. Use for complex logic.
+* `hybrid`: Scaffold + LLM enhancement. Default.
 
 ## Expected Logic
-
-1. Resolve `./skills/<skill-name>/`
-2. Ensure `SKILL.md` exists
-3. If `skill.py` exists:
-
-   * require `--overwrite`
-4. Parse YAML:
-
-   * name
-   * description
-   * allowed_tools
-   * execution_mode
-5. Extract `## Expected Logic` section
-6. Generate deterministic scaffold
-7. Apply execution mode:
-
-   * deterministic → keep scaffold
-   * llm → full LLM generation
-   * hybrid → enhance scaffold with LLM
-8. Validate generated code
-9. Write `skill.py`
-
----
+1. Resolve `./skills/<skill-name>/` and verify `SKILL.md` exists
+2. Check `skill.py` exists. If yes, require `--overwrite`
+3. Parse YAML front-matter: `name`, `description`, `allowed_tools`, `execution_mode`
+4. Extract `## Expected Logic` section from Markdown body
+5. Build deterministic scaffold with `Skill` subclass
+6. Apply execution_mode: call LLM if `llm` or `hybrid`
+7. Strip markdown fences, remove `<thinking>` blocks
+8. Run `validate_skill_py`. Fail if invalid.
+9. If `--dry_run`, return code preview. Else write `skill.py`
 
 ## Expected Output
 
-### Deterministic
-
-```
-✅ skill.py generated for '<skill-name>'
-Location: ./skills/<skill-name>/skill.py
-🧱 Deterministic
-```
-
-### LLM
-
-```
-✅ skill.py generated for '<skill-name>'
-Location: ./skills/<skill-name>/skill.py
-🤖 LLM-generated
-```
-
-### Hybrid
-
-```
-✅ skill.py generated for '<skill-name>'
-Location: ./skills/<skill-name>/skill.py
+### Success
+✅ skill.py generated for 'bug_fix'
+Location:./skills/bug_fix/skill.py
 ⚙️ Hybrid (scaffold + LLM)
-```
+
+### Dry run
+
+[DRY RUN] Would create./skills/bug_fix/skill.py
+=== Code Preview ===
+from py_mono.skill.base import Skill, SkillContext
+...
 
 ### Errors
-
-Missing SKILL.md:
-
-```
-❌ No SKILL.md found
-```
-
-Overwrite required:
-
-```
-❌ skill.py already exists
-Use --overwrite to regenerate.
-```
-
-Validation failure:
-
-```
-❌ Generated skill.py failed validation:
-<reason>
-```
-
-
----
-
+❌ No SKILL.md found in./skills/bug_fix
+❌ skill.py already exists. Use --overwrite to regenerate.
+❌ Generated skill.py failed validation: Missing run() method
+❌ Invalid YAML in SKILL.md: execution_mode must be deterministic|llm|hybrid

@@ -1,6 +1,8 @@
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Any
 from py_mono.playbook.playbook import Playbook
+    import yaml
+from typing import Dict, Any
 
 
 class PlaybookRegistry:
@@ -23,7 +25,7 @@ class PlaybookRegistry:
 
         return playbooks
 
-    def search(self, query: str) -> List[Playbook]:
+    def search_deprecated(self, query: str) -> List[Playbook]:
         query = query.lower()
 
         # v1: dumb keyword match
@@ -33,3 +35,41 @@ class PlaybookRegistry:
                 results.append(pb)
 
         return results[:3]  # keep context small
+    
+
+    def search(self, query: str) -> List[Playbook]:
+        query_lower = query.lower()
+        query_words = set(query_lower.split())
+
+        scored = []
+        for pb in self._playbooks:
+            # Parse YAML front-matter for keywords
+            meta = self._parse_frontmatter(pb.content)
+            keywords = set([k.lower() for k in meta.get("keywords", [])])
+            name = meta.get("name", pb.name).lower()
+
+            score = 0
+            # Exact name match = highest priority
+            if name in query_lower or query_lower in name:
+                score += 100
+            # Keyword overlap
+            score += len(keywords & query_words) * 10
+            # Title match
+            if any(w in name for w in query_words):
+                score += 5
+
+            if score > 0:
+                scored.append((score, pb))
+
+        # Sort by score, return top 3
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [pb for score, pb in scored[:3]]
+
+    def _parse_frontmatter(self, content: str) -> Dict[str, Any]:
+        if not content.startswith("---"):
+            return {}
+        try:
+            _, fm, _ = content.split("---", 2)
+            return yaml.safe_load(fm) or {}
+        except:
+            return {}

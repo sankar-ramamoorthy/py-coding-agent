@@ -1,7 +1,7 @@
 ---
 name: refactor_extract_function
 description: Extract a block of code into a new helper function, preserving behavior and tests.
-trigger: /skill refactor_extract_function file:<path> start:<line> end:<line> name:<new_func_name>
+trigger: refactor_extract_function file:<path> start:<line> end:<line> name:<new_func_name>
 allowed_tools:
   - read_file
   - write_file
@@ -13,6 +13,7 @@ constraints:
   - No new dependencies.
   - No changes to .env or key files.
   - Must preserve existing behavior (no behavioral change).
+  - Must run pytest and pass before completing.
 status: approved
 ---
 # refactor_extract_function

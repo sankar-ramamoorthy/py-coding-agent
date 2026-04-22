@@ -1,56 +1,37 @@
-
-A first‑class `doc_sync` skill does:
-
-- Given a code file (or pattern) and docs/markdown,  
-- Read both,  
-- Update doc comments or README sections to match the current code,  
-- Write back the updated docs.
-
-You can implement it very similarly to `bug_fix` and `refactor_extract_function`:
-
-#### 1. `skills/doc_sync/SKILL.md`
-
-```markdown
 ---
 name: doc_sync
-description: Synchronize doc comments and user‑facing docs with current code.
-trigger: /skill doc_sync code:<path> docs:<path> [update_method:inplace|docstring]
+description: Synchronize docstrings and README sections with current code signatures
+trigger: /skill doc_sync code:<path> docs:<path> [target:function|class|module|readme] [dry_run:<true|false>]
+status: approved
 allowed_tools:
-  - read_file
-  - write_file
-  - edit_file
-  - list_files
+    - read_file
+    - write_file
+    - edit_file
+    - list_files
 constraints:
-  - No file deletion.
-  - No new dependencies.
-  - No changes to .env or key files.
-  - Prefer minimal edits (no complete rewrites).
-status: proposed
+    - No file deletion.
+    - No new dependencies.
+    - No changes to.env or key files.
+    - Prefer minimal edits. Human-reviewable diffs.
+    - Must not rewrite entire files unless docs:<path> is empty.
 ---
+
 # doc_sync
 
-A skill to keep documentation synchronized with code.
+Keeps documentation synchronized with code after refactors or API changes.
 
 **When to use:**
-
-- Docstrings no longer match the actual code.  
-- `README.md` or guides refer to APIs that have changed.
-
+- Docstring params don’t match function signature
+- README examples use old function names
+- Added/removed parameters not reflected in docs
 
 **What this skill does:**
-
-- Reads the code file (function, class, or entire module).  
-- Reads the corresponding doc file or markdown.  
-- Aligns high‑level descriptions and parameter lists with reality.  
-- Writes back the updated doc (or docstring) file.  
+1. Parse code with AST to extract actual functions/classes/params/returns
+2. Parse docs to find existing docstrings or README sections
+3. Use LLM to rewrite docs matching code reality
+4. Show diff. Apply if dry_run:false
+5. No tests to run, but validates Markdown/PEP-257 format
 
 **Constraints:**
-
-- No file deletion.  
-- No new dependencies.  
-- No changes to `.env` or key files.  
-- Changes should be minimal and human‑reviewable.
-```
-
-***
-
+- Minimal diffs only. Won’t regenerate whole README.
+- If docs:<path> doesn’t exist, creates it with basic structure.

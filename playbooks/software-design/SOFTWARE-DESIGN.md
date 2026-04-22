@@ -1,3 +1,10 @@
+---
+name: software-design
+description: Guides API design workflow from requirements to scaffold
+keywords: [build, create, api, flask, fastapi, backend, jwt, rest, scaffold, design]
+triggers: ["build me", "create api", "new project"]
+---
+
 # Software Design Playbook (Minimal)
 
 ## When to use

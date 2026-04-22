@@ -14,7 +14,7 @@ Output:
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
+import ast
 from py_mono.skill.base import Skill, SkillContext
 
 
@@ -88,10 +88,12 @@ class RefactorExtractFunctionSkill(Skill):
         )
 
         # 6. Generate call to helper
+        base_indent = re.match(r"(\s*)", lines[start_idx]).group(1)
         call = self._generate_call(
             func_name=name,
             inputs=inputs,
             outputs=outputs,
+            indent=base_indent,
         )
 
         # 7. Compute diff
@@ -101,34 +103,61 @@ class RefactorExtractFunctionSkill(Skill):
             return "[REFACTOR] No meaningful change detected; skipping write."
 
         # 8. Write updated file (if edit_file or write_file exists)
-        msg = ""
+        #msg = ""
 
+        #if "edit_file" in agent_tools:
+        #    edit_file = agent_tools["edit_file"]
+        #    result = edit_file.func(
+        #        {
+        #            "path": file_target,
+        #            "old_content": before,
+        #            "new_content": after,
+        #        }
+        #    )
+        #    msg += f"Edit result:\n{result}\n\n"
+        #elif "write_file" in agent_tools:
+        #    write_file = agent_tools["write_file"]
+        #    result = write_file.func(
+        #        {
+        #            "path": file_target,
+        #            "content": after,
+        #        }
+        #    )
+        #    msg += f"Write result:\n{result}\n\n"
+        #else:
+        #    return (
+        #        "[REFACTOR] No edit/write tool available. You must edit manually:\n"
+        #        + self._pretty_diff(before, after)
+        #    )
+
+        # 8. Dry-run check
+        dry_run = self._extract_str(request, "dry_run:") == "true"
+
+        if dry_run:
+            return (
+                f"[DRY RUN] Extracting {name} from {file_target} lines {start_line}..{end_line}\n\n"
+                "=== Patch Preview ===\n"
+                f"{self._pretty_diff(before, after)}\n\n"
+                "Run again with dry_run:false to apply changes."
+            )
+
+        # 9. Write updated file
+        msg = ""
         if "edit_file" in agent_tools:
             edit_file = agent_tools["edit_file"]
-            result = edit_file.func(
-                {
-                    "path": file_target,
-                    "old_content": before,
-                    "new_content": after,
-                }
-            )
+            result = edit_file.func({"path": file_target, "old_content": before, "new_content": after})
             msg += f"Edit result:\n{result}\n\n"
         elif "write_file" in agent_tools:
             write_file = agent_tools["write_file"]
-            result = write_file.func(
-                {
-                    "path": file_target,
-                    "content": after,
-                }
-            )
+            result = write_file.func({"path": file_target, "content": after})
             msg += f"Write result:\n{result}\n\n"
         else:
             return (
                 "[REFACTOR] No edit/write tool available. You must edit manually:\n"
                 + self._pretty_diff(before, after)
             )
-
-        # 9. Write a test
+        
+        # 10. Write a test
         test_result = self._write_test_and_run(
             agent_tools=agent_tools,
             workspace_root=workspace_root,
@@ -136,9 +165,10 @@ class RefactorExtractFunctionSkill(Skill):
             func_name=name,
             inputs=inputs,
             outputs=outputs,
+            original_content=before,
         )
 
-        # 10. Show diff
+        # 11. Show diff
         return (
             f"RefactorExtractFunction: extracted {name} from {file_target} "
             f"lines {start_line}..{end_line}.\n\n"
@@ -208,12 +238,54 @@ class RefactorExtractFunctionSkill(Skill):
         helper: str,
         call_line: str,
     ) -> str:
+        # Find parent def to insert helper above it
+        parent_def_idx = start_idx
+        while parent_def_idx >= 0 and not lines[parent_def_idx].lstrip().startswith("def "):
+            parent_def_idx -= 1
+
+        indent = re.match(r"(\s*)", lines[parent_def_idx]).group(1) if parent_def_idx >= 0 else ""
+        helper_lines = [indent + l for l in helper.splitlines()]
+
+        new_lines = lines[:]
+        new_lines[start_idx:end_idx] = [call_line] # call_line already has correct indent
+        new_lines[parent_def_idx:parent_def_idx] = [""] + helper_lines + [""]
+        return "\n".join(new_lines)
+
+    def _apply_extraction_deprecated(
+        self,
+        lines: List[str],
+        start_idx: int,
+        end_idx: int,
+        helper: str,
+        call_line: str,
+    ) -> str:
         # TODO: in a richer version, you’d search for function def and inject after def.
         # For now, append helper at the end and replace the block with the call.
         lines[start_idx:end_idx] = [call_line]
         return "\n".join(lines) + "\n\n" + helper
 
     def _infer_block_inputs_outputs(self, block: List[str]) -> Tuple[List[str], List[str]]:
+        code = "\n".join(block)
+        try:
+            tree = ast.parse(code)
+        except SyntaxError:
+            return [], [] # Can't parse, bail safely
+
+        class Visitor(ast.NodeVisitor):
+            def __init__(self):
+                self.loads = set() # variables read
+                self.stores = set() # variables written
+            def visit_Name(self, node):
+                if isinstance(node.ctx, ast.Load): self.loads.add(node.id)
+                if isinstance(node.ctx, ast.Store): self.stores.add(node.id)
+
+        v = Visitor()
+        v.visit(tree)
+        inputs = sorted(v.loads - v.stores) # read but not defined in block
+        outputs = sorted(v.stores) # defined in block
+        return inputs, outputs
+
+    def _infer_block_inputs_outputs_deprecated(self, block: List[str]) -> Tuple[List[str], List[str]]:
         # 1. Simple: collect vars that appear in the block but not in definitions.
         # In a real system you’d parse AST; here just heuristic on identifiers.
         # For this example, assume inputs = any identifier that appears before `=`,
@@ -249,7 +321,24 @@ class RefactorExtractFunctionSkill(Skill):
 
         return inputs, outputs
 
-    def _generate_helper_function(
+    def _generate_helper_function(self, func_name: str, inputs: List[str], outputs: List[str], block: List[str]) -> str:
+        params = ", ".join(inputs) if inputs else ""
+        body = "\n".join(" " + line for line in block)
+
+        if len(outputs) == 1:
+            ret_line = f" return {outputs[0]}"
+        elif len(outputs) > 1:
+            ret_line = f" return {', '.join(outputs)}"
+        else:
+            ret_line = " # no outputs detected"
+
+        return f'''def {func_name}({params}):
+        """Auto-generated helper extracted from original block."""
+    {body}
+    {ret_line}
+    '''
+
+    def _generate_helper_function_deprecated(
         self,
         func_name: str,
         inputs: List[str],
@@ -286,23 +375,18 @@ class RefactorExtractFunctionSkill(Skill):
         func_name: str,
         inputs: List[str],
         outputs: List[str],
+        indent: str = " ",
     ) -> str:
-        if not inputs:
-            inputs = ["..."]
-
-        if not outputs:
-            outputs = ["..."]
-
-        # Naive: helper call that just passes inputs
-        args = ", ".join(inputs)
+        args = ", ".join(inputs) if inputs else ""
+        call = f"{func_name}({args})"
 
         if len(outputs) == 1:
-            output = outputs[0]
-            return f"    {output} = {func_name}({args})"
+            return f"{indent}{outputs[0]} = {call}"
+        elif len(outputs) > 1:
+            return f"{indent}{', '.join(outputs)} = {call}"
         else:
-            # Multiple outputs: assume they are assigned by the helper.
-            return f"    {func_name}({args})"
-
+            return f"{indent}{call}"
+        
     def _write_test_and_run(
         self,
         agent_tools: Dict[str, Any],
@@ -311,6 +395,7 @@ class RefactorExtractFunctionSkill(Skill):
         func_name: str,
         inputs: List[str],
         outputs: List[str],
+        original_content: str,
     ) -> str:
         rel_path = Path(file_path)
         if rel_path.suffix == ".py":
@@ -358,7 +443,21 @@ class RefactorExtractFunctionSkill(Skill):
             }
         )
 
-        return s_result.get("stdout", "") + s_result.get("stderr", "")
+        #return s_result.get("stdout", "") + s_result.get("stderr", "")
+        s_result = shell.func({"command": shell_cmd})
+
+        # Check returncode for failure
+        if s_result.get("returncode", 0)!= 0:
+            # Rollback
+            write_file = agent_tools["write_file"]
+            write_file.func({"path": file_path, "content": original_content})
+            return (
+                "[REFACTOR] Tests failed after extraction. Rolled back.\n"
+                f"stdout:\n{s_result.get('stdout', '')}\n"
+                f"stderr:\n{s_result.get('stderr', '')}"
+            )
+
+        return s_result.get("stdout", "") + s_result.get("stderr", "")        
 
     def _build_dummy_test(
         self,

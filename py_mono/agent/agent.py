@@ -542,12 +542,15 @@ class Agent:
                 (m["content"] for m in reversed(self.memory) if m["role"] == "user"),
                 user_input
             )
+            self._log(f"latest_user_msg {latest_user_msg} ")
+
 
             playbooks = self.playbook_registry.search(latest_user_msg)
 
 
             # 🔥 Build augmented system prompt
             base_system = self.memory[0]["content"]
+            self._log(f"base_system {base_system} ")
             playbook_text = self._format_playbooks_for_prompt(playbooks)
 
             if playbook_text:

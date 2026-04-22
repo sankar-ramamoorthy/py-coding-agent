@@ -1,6 +1,6 @@
-# skills/generate-skill/skill.py
+# skills/generate_skill/skill.py
 """
-generate-skill — LLM-powered skill generator.
+generate_skill — LLM-powered skill generator.
 
 Generates a complete, working skill (SKILL.md + skill.py) from a
 name and description using two LLM calls:
@@ -11,10 +11,10 @@ name and description using two LLM calls:
 Validation is applied before saving. See ADR-011 and ADR-013.
 
 Usage:
-    /skill generate-skill <skill-name> | <description>
+    /skill generate_skill <skill-name> | <description>
 
 Example:
-    /skill generate-skill list-python-files | List all Python files in workspace
+    /skill generate_skill list-python-files | List all Python files in workspace
 """
 
 import json, re
@@ -34,7 +34,7 @@ MAX_RETRIES = 1  # one retry on skill.py validation failure
 class GenerateSkill(Skill):
 
     def name(self) -> str:
-        return "generate-skill"
+        return "generate_skill"
 
     def description(self) -> str:
         return "Generate a new skill (SKILL.md + skill.py) using the LLM"
@@ -44,7 +44,7 @@ class GenerateSkill(Skill):
         Parse request, call LLM twice, validate, save.
 
         Args:
-            request : full command e.g. '/skill generate-skill list-python-files | description'
+            request : full command e.g. '/skill generate_skill list-python-files | description'
             context : SkillContext with session_manager and agent_tools
 
         Returns:
@@ -143,11 +143,11 @@ class GenerateSkill(Skill):
 
     def _parse_request(self, request: str):
         """
-        Parse '/skill generate-skill <name> | <description>'.
+        Parse '/skill generate_skill <name> | <description>'.
         Returns (skill_name, description) tuple or error string.
         """
         # Strip command prefix
-        prefix = "/skill generate-skill"
+        prefix = "/skill generate_skill"
         raw = request.strip()
         if raw.startswith(prefix):
             raw = raw[len(prefix):].strip()
@@ -155,8 +155,8 @@ class GenerateSkill(Skill):
         parts = raw.split("|", 1)
         if len(parts) != 2:
             return (
-                "Usage: /skill generate-skill <skill-name> | <description>\n"
-                "Example: /skill generate-skill list-python-files | "
+                "Usage: /skill generate_skill <skill-name> | <description>\n"
+                "Example: /skill generate_skill list-python-files | "
                 "List all Python files in the workspace with sizes"
             )
 

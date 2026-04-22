@@ -277,7 +277,7 @@ Switched provider to OllamaProvider (ollama) using model 'granite4:350m'.
 
 Run normal tasks (all of these automatically use the currently active provider):
 
-```text
+```
 > list files
 > what is the current date and time
 > read file plan.md
@@ -291,6 +291,31 @@ Run normal tasks (all of these automatically use the currently active provider):
 ```
 
 ---
+## Built-in Skills
+
+Skills are first-class workflows. Call them with `/skill <name>`. All follow ADR-016: they only use tools from the registry, never direct syscalls.
+
+| Skill | Purpose | Example |
+| --- | --- | --- |
+| `bug_fix` | Fix a bug from stack trace. Reads code, applies minimal patch, runs pytest, rolls back on failure | `/skill bug_fix KeyError:'user' file:src/auth.py line:42` |
+| `refactor_extract_function` | Extract code block into helper function. Preserves behavior + tests | `/skill refactor_extract_function file:src/foo.py start:42 end:48 name:calc_discount` |
+| `doc_sync` | Sync docstrings/README with actual code signatures using AST | `/skill doc_sync code:src/api.py docs:README.md target:readme` |
+| `generate_playbook` | LLM-generate a reasoning playbook .md with YAML front-matter for PlaybookRegistry | `/skill generate_playbook category:testing \| description:pytest guide \| keywords:test,pytest` |
+| `create_skill_py` | Meta-skill: compile SKILL.md → skill.py. Deterministic/LLM/hybrid modes | `/skill create_skill_py bug_fix --overwrite` |
+| `scaffold_project` | Bootstrap new Python project: pyproject.toml, src/, tests/ | `/skill scaffold_project name:myapp` |
+| `generate_skill` | Legacy: LLM-generate new skill from prompt. Use `create_skill_py` instead | `/skill generate_skill "docker build skill"` |
+| `hello` | Test skill. Verifies skill loading works | `/skill hello` |
+
+### Common Flags
+Most skills support:
+- `dry_run:true` — Show diff/preview without writing files
+- `--overwrite` — Replace existing output file
+
+### Skill vs Playbook
+- **Skill**: Executable workflow. Has `skill.py`, calls tools, writes files. Lives in `skills/`
+- **Playbook**: Reasoning guide. Markdown only, injected by `PlaybookRegistry`. Lives in `playbooks/`
+
+Run `/clear` after creating new skills/playbooks to reload them.
 
 ### Current Limitations
 

@@ -307,3 +307,39 @@ This separation aligns with modern agent architectures while preserving:
 * Determinism
 * Safety
 * Reviewability
+
+## ADR-016: Tool Usage Contract
+
+All execution skills MUST follow ADR-016:
+
+1. **No direct syscalls**: Never `import subprocess`, `os.system`, `open()` for writes, or `requests`
+2. **Use agent_tools only**: All file/process/network I/O via `context.agent_tools["tool_name"].func({...})`
+3. **Sandbox enforced**: `write_file` and `edit_file` validate paths stay under `workspace_root`
+
+Violation = skill rejected by code review.
+
+## Current Skill Inventory
+
+Last updated: 2026-04-20
+
+| Skill | Status | Mode | Dry-run | Description |
+| --- | --- | --- | --- | --- |
+| `bug_fix` | approved | hybrid | yes | Patch code from stack trace + pytest rollback |
+| `refactor_extract_function` | approved | hybrid | yes | Extract block to helper + test |
+| `doc_sync` | approved | hybrid | yes | Sync docstrings/README with AST |
+| `generate_playbook` | approved | hybrid | yes | LLM-generate playbook .md with YAML |
+| `create_skill_py` | approved | hybrid | yes | Compile SKILL.md → skill.py |
+| `scaffold_project` | approved | deterministic | no | Bootstrap pyproject.toml + src/ |
+| `generate_skill` | deprecated | llm | no | Use `create_skill_py` instead |
+| `hello` | approved | deterministic | no | Test stub |
+
+## Playbook vs Skill Cheat Sheet
+
+|  | Playbook | Skill |
+| --- | --- | --- |
+| Location | `playbooks/<cat>/*.md` | `skills/<name>/` |
+| File | Markdown only | `SKILL.md` + `skill.py` |
+| Invocation | Automatic via keywords | Explicit `/skill <name>` |
+| Writes files? | No | Yes, via tools |
+| Needs approval? | No | Yes, `status: approved` |
+| Example | `playbooks/testing/pytest_guide.md` | `skills/bug_fix/` |
