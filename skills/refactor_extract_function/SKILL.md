@@ -1,7 +1,7 @@
 ---
 name: refactor_extract_function
 description: Extract a block of code into a new helper function, preserving behavior and tests.
-trigger: refactor_extract_function file:<path> start:<line> end:<line> name:<new_func_name>
+trigger: /skill refactor_extract_function file:<path> start:<line> end:<line> name:<new_func_name> dry_run:<true|false>
 allowed_tools:
   - read_file
   - write_file
