@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-Core application code lives in `py_mono/`. Key areas include `agent/` for the execution loop, `llm/` for provider integrations, `tools/` for built-in tools, `skill/` for the skills framework, `session/` for runtime provider state, and `ui/` for the CLI. Repo-level `skills/` contains individual skill packages (`SKILL.md` plus optional `skill.py`). `mcp_servers/datetime/` holds the sample FastMCP service. Use `dynamic_tools/` for runtime-generated tools, `workspace/` for sandboxed working files, and `docs/` plus `docs/adr/` for design notes and ADRs.
+Core application code lives in `py_mono/`. Key areas include `agent/` for the execution loop, `llm/` for provider integrations, `tools/` for built-in tools, `skill/` for the skills framework, `session/` for runtime provider state, and `ui/` for the CLI. Repo-level `skills/` contains individual skill packages (`SKILL.md` plus optional `skill.py`). `mcp_servers/datetime/` holds the sample FastMCP service. Use `dynamic_tools/` for runtime-generated tools, `workspace/` for sandboxed working files, and `docs/` plus `docs/adr/` for design notes and ADRs. `docs/ISSUES.md` tracks open issues; `docs/PROJECT_STATUS.md`, `CURRENT_FOCUS.md`, `NEXT_ACTIONS.md`, and `SESSION_LOG.md` track session-to-session state (see Session Completion below).
 
 ## Build, Test, and Development Commands
 Use `uv` and Docker Compose for the standard workflow.
@@ -21,6 +21,21 @@ Follow existing Python style: 4-space indentation, snake_case for functions/modu
 
 ## Commit & Pull Request Guidelines
 Recent history uses short, imperative commit messages such as `added playbook` and `fixed issue with generate-skill`. Keep commits focused and descriptive; prefer one concern per commit. PRs should summarize behavior changes, list affected areas, link any issue or ADR, and include terminal output or screenshots when CLI behavior changes.
+
+## Session Completion
+At the end of a work session (or before handing off), record a completion report in
+`docs/SESSION_LOG.md` using this format:
+- **Issue** — which `docs/ISSUES.md` entry (or ad-hoc description) this session addressed.
+- **Scope completed** — what was actually finished, in concrete terms.
+- **Files changed** — list of touched paths.
+- **Design decisions** — notable choices made and why.
+- **Validation** — commands run and their results (tests, manual checks).
+- **Open items** — anything left unresolved or deferred.
+- **Next safe action** — the next concrete step a future session (human or agent) can take
+  without re-deriving context.
+Update `docs/PROJECT_STATUS.md`, `docs/CURRENT_FOCUS.md`, and `docs/NEXT_ACTIONS.md` to
+reflect the new state at the same time. Do not leave the repository in a state where the
+next session must reconstruct what happened from `git diff` alone.
 
 ## Feature Planning with Spec Kit
 For new features, use Spec Kit's structured workflow before writing code: `/speckit-specify`
