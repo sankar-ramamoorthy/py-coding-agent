@@ -4,9 +4,10 @@ Snapshot of overall project state. Update at milestone boundaries, not every ses
 for moment-to-moment state use `CURRENT_FOCUS.md` and `SESSION_LOG.md` instead.
 
 ## Current milestone
-ms5-skills (skills layer, Spec Kit integration) — `kb-template` branch's increment
-(portable knowledge-base scaffold + process-doc bootstrap) is implemented and verified,
-not yet pushed/merged. See `docs/SESSION_LOG.md` (2026-08-03 entry) for the full record.
+ms5-skills (skills layer, Spec Kit integration). `kb-template` (portable knowledge-base
+scaffold) merged to `main` via PR #79. `ollama-dual-backend` (local/remote Ollama
+selection, ISS-007) is implemented and verified against real backends, not yet
+pushed/merged. See `docs/SESSION_LOG.md` for full records of both.
 
 ## Known critical/open issues
 See `docs/ISSUES.md` for the live register. As of 2026-08-03: the sandbox escape
