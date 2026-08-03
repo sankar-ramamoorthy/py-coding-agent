@@ -113,3 +113,70 @@ tracked as separate future work.
 
 **Next safe action**: Commit and push these fixes to update PR #79, then it's ready for
 merge review.
+
+---
+
+## 2026-08-03 — Dual Ollama backend selection (local + remote GPU)
+**Issue**: ISS-007
+
+**Scope completed**:
+- Registered `ISS-007`, ran the full Spec Kit cycle (second feature in this repo):
+  `specs/002-ollama-dual-backend/{spec,plan,research,data-model,quickstart}.md`,
+  `contracts/provider-selection.md`, `checklists/requirements.md`, `tasks.md` (23 tasks).
+- Added `ollama-remote`/`ollama-local`/`ollama-auto` entries to
+  `py_mono/llm/provider_registry.py`'s `REGISTRY`, all wrapping the existing
+  `OllamaProvider` (given a new optional `base_url` constructor parameter in
+  `py_mono/llm/ollama_provider.py`).
+- Added `py_mono/llm/ollama_connectivity.py` (`is_ollama_reachable`) — a one-time,
+  2-second-timeout reachability probe used only by `ollama-auto`.
+- Changed `LLM_PROVIDER`'s default from `"ollama"` to `"ollama-auto"` in
+  `py_mono/config.py`; updated `.env.example` and `docker-compose.yml` with the four new
+  env vars (`OLLAMA_REMOTE_URL`, `OLLAMA_REMOTE_MODEL`, `OLLAMA_LOCAL_URL`,
+  `OLLAMA_LOCAL_MODEL`).
+- Added `tests/llm/` (3 files, 22 tests) and `tests/session/test_session_manager.py`
+  (5 tests) — all mocked, zero real network calls in the automated suite.
+
+**Files changed**: See commits `bf1e23b` (issue + Spec Kit artifacts), `550a51d`
+(implementation) on branch `ollama-dual-backend`. Also this commit's session-doc updates.
+
+**Design decisions**:
+- Bare `ollama` kept completely frozen (still only reads `OLLAMA_BASE_URL`/`OLLAMA_MODEL`,
+  no probing) for full backward compatibility — confirmed explicitly with the user before
+  implementation, since redefining it would have silently changed existing behavior.
+- `ollama-remote`/`ollama-local` never probe reachability — failures surface as direct,
+  real connection errors, distinct from `ollama-auto`'s silent fallback. Confirmed by a
+  dedicated test (`test_explicit_backends_never_probe_reachability`) and by real-backend
+  verification (Scenario 4).
+- The reachability probe lives in its own small module (`ollama_connectivity.py`) rather
+  than inline in `provider_registry.py`, so it's independently mockable without importing
+  the whole registry.
+- No changes to `py_mono/agent/agent.py`'s command dispatch, the shell tool, dynamic-tool
+  loading, or the execution loop — confirmed during planning that the existing
+  `/provider <name> <model>` command already threads any new registry name through with
+  zero code changes there.
+
+**Validation**:
+- `python -m compileall -q py_mono` — exit 0.
+- `pytest` (full suite, excluding the pre-existing broken `test_listallpy_skill.py`
+  collection) — 47 passed, 2 pre-existing failures (ISS-005, confirmed unaffected/unrelated
+  to this branch), 0 regressions from this feature.
+- Real, non-mocked verification inside the Docker container (matching actual usage, since
+  `host.docker.internal` doesn't resolve from the host directly) against both live
+  backends: `ollama-auto` resolved to remote and returned a real chat response;
+  `ollama-remote`/`ollama-local` explicit selection both worked; model override to
+  `qwen3:4b` on the remote backend worked and correctly reverted to `qwen3.5:4b` on the
+  next selection with no override; forcing the remote URL unreachable made `ollama-auto`
+  fall back to local within 2.02s (the probe timeout); the same forced-unreachable address
+  under an *explicit* `ollama-remote` selection raised a real `ConnectionError` rather than
+  silently falling back; `LLM_PROVIDER=ollama` (legacy) resolved byte-for-byte as before.
+
+**Open items**:
+- ISS-002, ISS-003 (sandbox/execution security issues) — untouched, deliberately out of
+  scope for this branch, per the user's original "even before fixing C-01 through C-03"
+  framing (still not started).
+- ISS-005, ISS-006 — pre-existing, unrelated, not fixed here.
+- Branch `ollama-dual-backend` has not been pushed or opened as a PR — left ready locally.
+
+**Next safe action**: Review the `ollama-dual-backend` branch's 2 commits (plus this
+session-doc commit), then push and open a PR into `main` when ready. Separately, decide
+whether ISS-002/ISS-003 (the original C-02/C-03 security findings) are next.

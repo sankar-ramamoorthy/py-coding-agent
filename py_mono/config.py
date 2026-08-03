@@ -5,11 +5,18 @@ Configuration for py-coding-agent.
 Environment Variables:
 
 LLM Provider:
-    LLM_PROVIDER        — 'ollama' (default) or 'litellm'
+    LLM_PROVIDER        — 'ollama-auto' (default), 'ollama-remote', 'ollama-local',
+                          'ollama' (legacy single-backend), or 'litellm'
 
-Ollama (default):
+Ollama (legacy single-backend, used only when LLM_PROVIDER=ollama):
     OLLAMA_BASE_URL     — base URL for Ollama host (default: http://host.docker.internal:11434)
     OLLAMA_MODEL        — model name (default: lfm2.5-thinking:latest)
+
+Ollama dual-backend (used by ollama-auto/ollama-remote/ollama-local):
+    OLLAMA_REMOTE_URL   — remote (GPU) Ollama base URL (default: http://100.105.24.12:11434)
+    OLLAMA_REMOTE_MODEL — remote default model (default: qwen3.5:4b)
+    OLLAMA_LOCAL_URL    — local Ollama base URL (default: http://host.docker.internal:11434)
+    OLLAMA_LOCAL_MODEL  — local default model (default: Qwen3:4b)
 
 LiteLLM (optional, set LLM_PROVIDER=litellm):
     LITELLM_MODEL       — model string in litellm format (default: groq/llama-3.3-70b-versatile)
@@ -25,7 +32,7 @@ import os
 from pathlib import Path
 
 # LLM provider selection
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama-auto")
 
 # Ollama settings
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
