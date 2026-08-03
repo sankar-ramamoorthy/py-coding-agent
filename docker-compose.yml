@@ -15,9 +15,13 @@ services:
       - ./skills:/app/skills    
     environment:
       - LLM_MASTER_KEY=${LLM_MASTER_KEY}
-      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama-auto}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-lfm2.5-thinking:latest}
+      - OLLAMA_REMOTE_URL=${OLLAMA_REMOTE_URL:-http://100.105.24.12:11434}
+      - OLLAMA_REMOTE_MODEL=${OLLAMA_REMOTE_MODEL:-qwen3.5:4b}
+      - OLLAMA_LOCAL_URL=${OLLAMA_LOCAL_URL:-http://host.docker.internal:11434}
+      - OLLAMA_LOCAL_MODEL=${OLLAMA_LOCAL_MODEL:-Qwen3:4b}
       - LITELLM_MODEL=${LITELLM_MODEL:-groq/qwen/qwen3-32b}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - DATETIME_MCP_URL=http://datetime-mcp:50051/mcp

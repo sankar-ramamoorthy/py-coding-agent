@@ -23,7 +23,7 @@ directories (neither exists yet, confirmed by checking directly).
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `tests/llm/` and `tests/session/` directories
+- [X] T001 Create `tests/llm/` and `tests/session/` directories
 
 ---
 
@@ -36,23 +36,27 @@ part of the same resolution logic).
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T002 Add optional `base_url: Optional[str] = None` constructor parameter to
+- [X] T002 Add optional `base_url: Optional[str] = None` constructor parameter to
       `OllamaProvider.__init__` in `py_mono/llm/ollama_provider.py` — falls back to
       `os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")` when omitted, so
       bare `ollama`'s behavior is byte-for-byte unchanged
-- [ ] T003 [P] Write `tests/llm/test_ollama_provider.py`: explicit `base_url` argument wins
+- [X] T003 [P] Write `tests/llm/test_ollama_provider.py`: explicit `base_url` argument wins
       over the env var; omitting it falls back to `OLLAMA_BASE_URL` exactly as before
       (backward-compatibility regression test for bare `ollama`)
-- [ ] T004 Add `ollama-remote` and `ollama-local` entries to `REGISTRY` plus a
+- [X] T004 Add `ollama-remote` and `ollama-local` entries to `REGISTRY` plus a
       `_OLLAMA_BACKENDS` dispatch table (backend name → base_url env/default, model
       env/default) and the resolution branch in `get_provider` in
-      `py_mono/llm/provider_registry.py`, per `data-model.md`'s concrete table (depends on T002)
-- [ ] T005 [P] Write `tests/llm/test_provider_registry.py` covering: `get_provider("ollama-remote")`
+      `py_mono/llm/provider_registry.py`, per `data-model.md`'s concrete table (depends on T002).
+      Implemented together with T009's `ollama-auto` entry in the same edit since they share
+      the same `get_provider` resolution branch — required creating T008's
+      `ollama_connectivity.py` module ahead of schedule so the import resolved.
+- [X] T005 [P] Write `tests/llm/test_provider_registry.py` covering: `get_provider("ollama-remote")`
       resolves `OLLAMA_REMOTE_URL`/`OLLAMA_REMOTE_MODEL` defaults; `get_provider("ollama-local")`
       resolves `OLLAMA_LOCAL_URL`/`OLLAMA_LOCAL_MODEL` defaults; explicit `model` argument
       overrides the env default for either; bare `get_provider("ollama")` is unchanged
       (still only reads `OLLAMA_BASE_URL`/`OLLAMA_MODEL`); unknown name still raises
-      `ValueError` listing all registry keys (depends on T004)
+      `ValueError` listing all registry keys (depends on T004). Also folded in T007's
+      `ollama-auto` cases in the same file.
 
 **Checkpoint**: Explicit local/remote resolution works — user story implementation can begin
 
@@ -71,32 +75,32 @@ automatically).
 
 > Write these tests FIRST; ensure they FAIL before implementation (T008, T009 don't exist yet)
 
-- [ ] T006 [P] [US1] Write `tests/llm/test_ollama_connectivity.py`: `is_ollama_reachable`
+- [X] T006 [P] [US1] Write `tests/llm/test_ollama_connectivity.py`: `is_ollama_reachable`
       returns `True` on a mocked 2xx response; returns `False` on a mocked
       `requests.RequestException` (timeout, connection error) and on a mocked non-2xx response
-- [ ] T007 [US1] Add `ollama-auto` test cases to `tests/llm/test_provider_registry.py`: mock
+- [X] T007 [US1] Add `ollama-auto` test cases to `tests/llm/test_provider_registry.py`: mock
       `is_ollama_reachable` to return `True` → `get_provider("ollama-auto")` resolves via the
       `ollama-remote` path; mock it to return `False` → resolves via the `ollama-local` path.
       No real network calls in either case.
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Create `py_mono/llm/ollama_connectivity.py` with
+- [X] T008 [US1] Create `py_mono/llm/ollama_connectivity.py` with
       `is_ollama_reachable(base_url: str, timeout: float = 2.0) -> bool` per `data-model.md`
-- [ ] T009 [US1] Add `ollama-auto` to `REGISTRY` and its resolution branch in
+- [X] T009 [US1] Add `ollama-auto` to `REGISTRY` and its resolution branch in
       `py_mono/llm/provider_registry.py`: probe the remote backend's URL once via
       `is_ollama_reachable`, resolve to the `ollama-remote` construction path if reachable,
       else the `ollama-local` path (depends on T004, T008)
-- [ ] T010 [US1] Change `LLM_PROVIDER`'s default from `"ollama"` to `"ollama-auto"` in
+- [X] T010 [US1] Change `LLM_PROVIDER`'s default from `"ollama"` to `"ollama-auto"` in
       `py_mono/config.py`; add doc-comment lines for the four new env vars
-- [ ] T011 [US1] Update `.env.example`: `LLM_PROVIDER=ollama-auto`, add commented-out
+- [X] T011 [US1] Update `.env.example`: `LLM_PROVIDER=ollama-auto`, add commented-out
       `OLLAMA_REMOTE_URL`, `OLLAMA_REMOTE_MODEL`, `OLLAMA_LOCAL_URL`, `OLLAMA_LOCAL_MODEL`
       lines showing their defaults
-- [ ] T012 [US1] Update `docker-compose.yml`'s `py-coding-agent` service: add the four new
+- [X] T012 [US1] Update `docker-compose.yml`'s `py-coding-agent` service: add the four new
       env vars using the `${VAR:-default}` pattern; normalize `OLLAMA_BASE_URL` to the same
       pattern (small adjacent fix)
-- [ ] T013 [US1] Run `pytest tests/llm/ -v` and confirm all foundational + US1 test cases
-      (T003, T005, T006, T007) pass
+- [X] T013 [US1] Run `pytest tests/llm/ -v` and confirm all foundational + US1 test cases
+      (T003, T005, T006, T007) pass — 22/22 passed
 
 **Checkpoint**: User Story 1 is fully functional and independently testable — remote-first
 default with automatic fallback works (SC-001, SC-002).
@@ -114,20 +118,20 @@ and confirm a direct error, not a silent fallback.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T014 [US2] Write `tests/session/test_session_manager.py`: `SessionManager`
+- [X] T014 [US2] Write `tests/session/test_session_manager.py`: `SessionManager`
       construction with `default_provider="ollama-remote"` and `default_provider="ollama-local"`
       each resolve to the correct backend (mock the underlying HTTP layer, no real network);
       `switch_provider("ollama-local", model=...)` updates `provider_name`/`provider` correctly
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] No new production code expected — `ollama-remote`/`ollama-local` explicit
+- [X] T015 [US2] No new production code expected — `ollama-remote`/`ollama-local` explicit
       selection is already fully delivered by the Foundational phase (T004) and the existing
       `/provider <name> <model>` command (confirmed by reading `agent.py` during planning,
-      zero changes needed there). This task is verification: confirm `get_provider` never
-      calls `is_ollama_reachable` for these two names (i.e. explicit selections never probe
-      or silently fall back) — add an assertion/test for this if not already covered by T005
-- [ ] T016 [US2] Run `pytest tests/session/ -v` and confirm T014 passes
+      zero changes needed there). Verified: `test_explicit_backends_never_probe_reachability`
+      in `tests/llm/test_provider_registry.py` confirms `get_provider` never calls
+      `is_ollama_reachable` for `ollama-remote`/`ollama-local`/`ollama`.
+- [X] T016 [US2] Run `pytest tests/session/ -v` and confirm T014 passes — 5/5 passed
 
 **Checkpoint**: User Stories 1 AND 2 both work independently — explicit override with loud
 failure on unreachable selections (SC-003, FR-004).
@@ -144,19 +148,21 @@ used; select the same backend again without a model, confirm it reverts to the c
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T017 [US3] Add model-override test cases to `tests/llm/test_provider_registry.py` (if
+- [X] T017 [US3] Add model-override test cases to `tests/llm/test_provider_registry.py` (if
       not already fully covered by T005): `get_provider("ollama-remote", model="qwen3:4b")`
       returns a provider configured with `qwen3:4b`, not the `OLLAMA_REMOTE_MODEL` default;
       a subsequent `get_provider("ollama-remote")` with no model argument reverts to the
-      configured default (proves the override doesn't persist)
+      configured default (proves the override doesn't persist). Already covered by T005's
+      `test_ollama_remote_explicit_model_overrides_env_default` plus
+      `test_switch_provider_model_override_does_not_persist` in `tests/session/test_session_manager.py`.
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] No new production code expected — model override is already delivered by
+- [X] T018 [US3] No new production code expected — model override is already delivered by
       the Foundational phase's `_OLLAMA_BACKENDS` resolution logic (T004: `model or
       os.getenv(...)`) and the existing `/provider <name> <model>` command. This task is
       verification only.
-- [ ] T019 [US3] Run `pytest tests/llm/test_provider_registry.py -v` and confirm T017 passes
+- [X] T019 [US3] Run `pytest tests/llm/test_provider_registry.py -v` and confirm T017 passes — 12/12 passed
 
 **Checkpoint**: All three user stories are independently functional (SC-001 through SC-006).
 
@@ -164,12 +170,20 @@ used; select the same backend again without a model, confirm it reverts to the c
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T020 [P] Run `python -m compileall -q py_mono` — repo-wide syntax gate
-- [ ] T021 Run `pytest` (full suite) at the repo root — confirm nothing existing regressed
-- [ ] T022 Manually execute quickstart.md Scenarios 1–6 against the real backends (remote
-      preferred by default, automatic fallback, explicit override, unreachable-explicit
-      fails loudly, model override reverts after one use, `LLM_PROVIDER=ollama` backward
-      compatibility) and confirm each behaves exactly as documented
+- [X] T020 [P] Run `python -m compileall -q py_mono` — repo-wide syntax gate. Exit 0.
+- [X] T021 Run `pytest` (full suite) at the repo root — confirm nothing existing regressed.
+      47 passed, 2 pre-existing failures unrelated to this branch (ISS-005, confirmed
+      unaffected), 0 regressions.
+- [X] T022 Manually executed quickstart.md Scenarios 1–6 for real, inside the Docker
+      container (`docker compose run --rm py-coding-agent python ...`, matching real usage —
+      `host.docker.internal` doesn't resolve from the host itself). All 6 passed against the
+      live remote (`qwen3.5:4b`) and local (`Qwen3:4b`) backends: auto-default resolved to
+      remote and returned a real response; explicit `ollama-remote`/`ollama-local` both
+      returned real responses; model override to `qwen3:4b` on remote worked and reverted to
+      `qwen3.5:4b` on the next selection with no model arg; forced-unreachable `ollama-auto`
+      fell back to local in 2.02s (right at the probe timeout); forced-unreachable explicit
+      `ollama-remote` raised a real `ConnectionError` with no silent fallback; legacy
+      `LLM_PROVIDER=ollama` resolved exactly as before this feature.
 - [ ] T023 Update `docs/ISSUES.md` (mark `ISS-007` done), and fill in
       `docs/SESSION_LOG.md`, `docs/CURRENT_FOCUS.md`, `docs/NEXT_ACTIONS.md` with the real
       end-of-session state per AGENTS.md's Session Completion section
