@@ -7,9 +7,11 @@ import uuid
 from typing import Any, Dict, List, Optional
 from py_mono.session.session_manager import SessionManager
 from py_mono.llm.provider_registry import REGISTRY, get_provider
-from py_mono.skill.base import SkillContext, SkillRegistry, SKILLS_DIR
-from py_mono.config import WORKSPACE_ROOT
-from py_mono.skill.approval import run_skill_safe, ApprovalError,wrap_agent_tools 
+from py_mono.skill.base import SkillContext, SkillRegistry
+from py_mono.config import WORKSPACE_ROOT, ENABLE_DYNAMIC_TOOLS
+from py_mono.skill.approval import run_skill_safe, ApprovalError,wrap_agent_tools
+from py_mono.skill.validator import validate_skill_py
+from py_mono.skill import approval_ledger
 from py_mono.playbook.playbookregistry import PlaybookRegistry
 from py_mono.tools.tool_loader import load_dynamic_tools
 from pathlib import Path
@@ -209,6 +211,13 @@ class Agent:
         return ""
 
     def _reload_dynamic_tools(self) -> str:
+        if not ENABLE_DYNAMIC_TOOLS:
+            return (
+                "🔒 Dynamic tools are disabled (ENABLE_DYNAMIC_TOOLS=false) — "
+                "nothing was loaded. Set ENABLE_DYNAMIC_TOOLS=true to enable this "
+                "capability in a trusted environment."
+            )
+
         dynamic_tools = load_dynamic_tools(self.dynamic_tools_folder)
         new_dynamic_names = {tool.name for tool in dynamic_tools}
         removed_names = sorted(self.dynamic_tool_names - new_dynamic_names)
@@ -365,6 +374,20 @@ class Agent:
         if self.skill_registry.is_approved(skill_name):
             return f"[APPROVE] Skill '{skill_name}' is already approved."
 
+        # Re-validate the CURRENT skill.py before granting approval — not just
+        # whatever was reviewed when it was first written. Reject outright if
+        # it contains a known-unsafe pattern; SKILL.md and the approval ledger
+        # both stay untouched, and nothing ever executes (ISS-003).
+        skill_py_path = self.skill_registry.skills_dir / skill_name / "skill.py"
+        if skill_py_path.exists():
+            code = skill_py_path.read_text(encoding="utf-8")
+            result = validate_skill_py(code, skill_name)
+            if not result.valid:
+                return (
+                    f"[APPROVE] Skill '{skill_name}' failed validation — not approved.\n"
+                    f"{result.failure_reason()}"
+                )
+
         # Update status in SKILL.md
         updated = re.sub(
             r"status:\s*\S+",
@@ -381,10 +404,20 @@ class Agent:
 
         # Write back
         try:
-            skill_md_path = SKILLS_DIR / skill_name / "SKILL.md"
+            skill_md_path = self.skill_registry.skills_dir / skill_name / "SKILL.md"
             skill_md_path.write_text(updated, encoding="utf-8")
         except Exception as e:
             return f"[APPROVE] Failed to update SKILL.md: {e}"
+
+        # Record this approval in the ledger — separate from SKILL.md itself —
+        # tied to the exact skill.py content just validated above. A later
+        # edit to skill.py will no longer match this entry and the skill
+        # reverts to non-executing until re-approved (ISS-003).
+        if skill_py_path.exists():
+            ledger_path = approval_ledger.ledger_path_for(self.skill_registry.skills_dir)
+            ledger = approval_ledger.load_ledger(ledger_path)
+            approval_ledger.record_approval(ledger, skill_name, skill_py_path, seeded=False)
+            approval_ledger.save_ledger(ledger, ledger_path)
 
         # 🔥 Reload only this skill
         try:

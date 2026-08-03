@@ -37,6 +37,13 @@ Shell tool:
                           grants the agent shell command execution with the same reach it
                           has always had (filtered only by a best-effort blocklist, not
                           confined to the workspace). Only enable in a trusted environment.
+
+Dynamic tools:
+    ENABLE_DYNAMIC_TOOLS — 'true'/'1'/'yes'/'on' to auto-load tools from dynamic_tools/
+                          (default: false, disabled). Dynamic tools are LLM-generated
+                          Python that executes on load — even with static forbidden-pattern
+                          validation, this is not a full sandbox. Only enable in a trusted
+                          environment.
 """
 
 import os
@@ -63,5 +70,10 @@ ADDITIONAL_ALLOWED_PATHS = [
 
 # Shell tool gating
 ENABLE_SHELL_TOOL = os.getenv("ENABLE_SHELL_TOOL", "false").strip().lower() in (
+    "1", "true", "yes", "on",
+)
+
+# Dynamic tools gating
+ENABLE_DYNAMIC_TOOLS = os.getenv("ENABLE_DYNAMIC_TOOLS", "false").strip().lower() in (
     "1", "true", "yes", "on",
 )

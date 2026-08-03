@@ -17,7 +17,7 @@ Environment Variables:
 
 from typing import Optional
 
-from py_mono.config import LLM_PROVIDER, ENABLE_SHELL_TOOL
+from py_mono.config import LLM_PROVIDER, ENABLE_SHELL_TOOL, ENABLE_DYNAMIC_TOOLS
 from py_mono.agent.agent import Agent
 from py_mono.session.session_manager import SessionManager
 from py_mono.tools.read_file import read_tool
@@ -105,10 +105,15 @@ def main():
     # Base tools
     base_tools = build_base_tools()
 
-    # Dynamic tools
-    dynamic_tools = load_dynamic_tools()
-    if dynamic_tools:
-        print(f"🔧 Loaded {len(dynamic_tools)} dynamic tool(s): {[t.name for t in dynamic_tools]}")
+    # Dynamic tools — off by default; ENABLE_DYNAMIC_TOOLS must be explicitly
+    # set (ISS-003: LLM-generated code executes on load, not a full sandbox)
+    if ENABLE_DYNAMIC_TOOLS:
+        dynamic_tools = load_dynamic_tools()
+        if dynamic_tools:
+            print(f"🔧 Loaded {len(dynamic_tools)} dynamic tool(s): {[t.name for t in dynamic_tools]}")
+    else:
+        dynamic_tools = []
+        print("🔒 Dynamic tools disabled (ENABLE_DYNAMIC_TOOLS=false)")
 
     # MCP tools
     mcp_tools = load_mcp_tools()

@@ -1,7 +1,9 @@
+import ast
 import inspect
 import pathlib
 import re
 
+from py_mono.skill.validator import check_forbidden_patterns
 from py_mono.tools.tool import Tool
 
 TOOLS_DIR = pathlib.Path("dynamic_tools")
@@ -48,6 +50,18 @@ from py_mono.tools.tool import Tool
     }},
 )
 """
+
+        # Static safety check on the exact content that will be written and
+        # later executed — refuse to persist anything containing a known-
+        # unsafe pattern or that fails to parse (ISS-003).
+        try:
+            ast.parse(wrapped_code)
+        except SyntaxError as e:
+            return f"Error: generated tool code has a syntax error at line {e.lineno}: {e.msg}"
+
+        forbidden = check_forbidden_patterns(wrapped_code)
+        if forbidden:
+            return "Error: generated tool code failed the safety check: " + "; ".join(forbidden)
 
         path.write_text(wrapped_code, encoding="utf-8")
 
