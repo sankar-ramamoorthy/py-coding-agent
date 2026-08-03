@@ -4,8 +4,9 @@ Snapshot of overall project state. Update at milestone boundaries, not every ses
 for moment-to-moment state use `CURRENT_FOCUS.md` and `SESSION_LOG.md` instead.
 
 ## Current milestone
-ms5-skills (skills layer, Spec Kit integration) — in progress on branch `kb-template`
-for the current increment (kb-template knowledge-base scaffold + process-doc bootstrap).
+ms5-skills (skills layer, Spec Kit integration) — `kb-template` branch's increment
+(portable knowledge-base scaffold + process-doc bootstrap) is implemented and verified,
+not yet pushed/merged. See `docs/SESSION_LOG.md` (2026-08-03 entry) for the full record.
 
 ## Known critical/open issues
 See `docs/ISSUES.md` for the live register. As of 2026-08-03: the sandbox escape

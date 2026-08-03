@@ -1,12 +1,12 @@
 # Current Focus
 
 ## Active branch
-`kb-template`
+`kb-template` — implementation complete, awaiting review before push/PR.
 
-## What's being worked on right now
-Building `kb-template/` (a portable, self-contained knowledge-base scaffold) plus a
-repo process bootstrap (`docs/ISSUES.md`, the four session-handoff docs, and the
-Completion Report Format documented in AGENTS.md's Session Completion section).
+## What was just finished
+`kb-template/` (portable knowledge-base scaffold) and the repo process bootstrap
+(`docs/ISSUES.md`, session-handoff docs, Completion Report Format) are both done. See
+`docs/SESSION_LOG.md`'s 2026-08-03 entry for the full completion report.
 
 ## Why
 Two other projects (TradeForge-KnowledgeBase, AITrader) have each hand-built a similar
@@ -17,4 +17,5 @@ versions the pattern once, here, for reuse via `cp -r` / `git subtree split`.
 - Splitting `kb-template/` into its own repo
 - Migrating TradeForge-KnowledgeBase or AITrader onto this schema
 - Wiring the validator into this repo's own CI/pre-commit
-- ISS-002 / ISS-003 (sandbox/execution security issues) — unrelated to this branch
+- ISS-002 / ISS-003 (sandbox/execution security issues, formerly audit C-02/C-03)
+- ISS-005 (pre-existing, unrelated test failures — logged, not fixed)

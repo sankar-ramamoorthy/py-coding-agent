@@ -16,11 +16,13 @@ open pieces of work and known problems across sessions.
 
 | ID | Title | Status | Branch | Source | Notes |
 |----|-------|--------|--------|--------|-------|
-| ISS-001 | App fails to import/start (syntax errors) | in-progress | — | docs/project-audit-2026-08-02.md (C-01) | Commit `34e595e` ("fixed syntax errors and tested system") suggests this is already fixed. Re-verify with `python -m compileall` before closing. |
 | ISS-002 | `/workspace` sandbox escape via path-check bypass | open | — | docs/project-audit-2026-08-02.md (C-02) | Path-check accepts a naive prefix match; `shell=True` and a rw compose mount also implicated. Not yet remediated. |
 | ISS-003 | Skills/dynamic tools execute arbitrary code before approval | open | — | docs/project-audit-2026-08-02.md (C-03) | Approval enforcement happens after import/exec, not before. Not yet remediated. |
-| ISS-004 | Add kb-template/ portable knowledge-base scaffold | in-progress | kb-template | 2026-08-03 session | Reusable YAML front-matter + Obsidian-markdown scaffold, extracted before further TradeForge-KB/AITrader-style drift accumulates. |
+| ISS-005 | Pre-existing test failures unrelated to any current branch work | open | — | Discovered 2026-08-03 verifying kb-template | `tests/test_listallpy_skill.py` fails to collect (`ModuleNotFoundError: No module named 'skills'`); `tests/tools/test_create_tool.py` has 2 failing assertions (`test_create_tool_writes_file_for_valid_name`, `test_create_tool_rejects_invalid_module_name`) — behavior doesn't match test expectations. Confirmed pre-existing by reproducing identically with kb-template's changes stashed. Not fixed as part of kb-template (out of scope, unrelated concern per Constitution Principle I). |
 
 ## Closed
 
-(move rows here once `status: done`/`wontfix`, keep table for history)
+| ID | Title | Status | Branch | Source | Notes |
+|----|-------|--------|--------|--------|-------|
+| ISS-001 | App fails to import/start (syntax errors) | done | — | docs/project-audit-2026-08-02.md (C-01) | Confirmed fixed 2026-08-03: `python -m compileall -q py_mono skills kb-template` exits 0. Original fix landed in commit `34e595e` ("fixed syntax errors and tested system"). |
+| ISS-004 | Add kb-template/ portable knowledge-base scaffold | done | kb-template | 2026-08-03 session | Landed in commits `1dd949f`, `b12cc64`, `c3f8f80` on branch `kb-template`. Reusable YAML front-matter + Obsidian-markdown scaffold with a standalone validator, extracted before further TradeForge-KB/AITrader-style drift accumulates. See `specs/001-kb-template/`. |
