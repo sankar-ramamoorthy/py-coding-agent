@@ -25,7 +25,7 @@ def handle_special_command(
     guards: Dict[str, int],
 ) -> Optional[str]:
     text = text.strip()
-        if text == "/clear":
+    if text == "/clear":
         if memory:
             system = memory[0]
             memory.clear()

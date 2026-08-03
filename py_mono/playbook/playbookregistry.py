@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Dict, Any
 from py_mono.playbook.playbook import Playbook
-    import yaml
+import yaml
 from typing import Dict, Any
 
 
