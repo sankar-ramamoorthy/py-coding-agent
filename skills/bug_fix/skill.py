@@ -13,7 +13,7 @@ Steps:
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from py_mono.skill.base import Skill, SkillContext
 
@@ -220,15 +220,15 @@ class BugFixSkill(Skill):
                 new_line = old_line.replace(f"{obj}.{attr}", f"getattr({obj}, '{attr}', None)")
                 return old_line, new_line, f"Use getattr() to handle missing attribute"
 
-    if "IndexError" in error_str and "[" in old_line:
-        # arr[i] -> arr[i] if i < len(arr) else None
-        match = re.search(r"(\w+)\[(\w+)\]", old_line)
-        if match:
-            arr, i = match.group(1), match.group(2)
-            new_line = f"{indent}{arr}[{i}] if {i} < len({arr}) else None"
-            return old_line, new_line, f"Guard index access with length check"
+        if "IndexError" in error_str and "[" in old_line:
+            # arr[i] -> arr[i] if i < len(arr) else None
+            match = re.search(r"(\w+)\[(\w+)\]", old_line)
+            if match:
+                arr, i = match.group(1), match.group(2)
+                new_line = f"{indent}{arr}[{i}] if {i} < len({arr}) else None"
+                return old_line, new_line, f"Guard index access with length check"
 
-    return old_line, f"{indent}# TODO: Manual fix needed for: {error_str}", "No auto-patch available"
+        return old_line, f"{indent}# TODO: Manual fix needed for: {error_str}", "No auto-patch available"
 
     def _build_edit_suggestion_deprecated(
         self,
