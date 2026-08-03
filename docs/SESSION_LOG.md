@@ -70,3 +70,46 @@ PR into `main` when ready (this repo's `ms5-skills`/Spec Kit scaffold is also no
 `main` — the PR will carry both). Separately, decide whether to start on ISS-002/ISS-003
 (the original C-02/C-03 audit findings) next, per the user's original "even before fixing
 C-01 through C-03" framing.
+
+---
+
+## 2026-08-03 — kb-template: post-review fixes (PR #79)
+**Issue**: External code review of PR #79 (kb-template) flagged two issues to resolve
+before merge.
+
+**Scope completed**:
+- Reverted the root `pyproject.toml`/`uv.lock` explicit `pyyaml` dependency added in
+  `c3f8f80`. It wasn't actually required by kb-template (which already declares `pyyaml`
+  independently in its own `pyproject.toml` per FR-011/FR-015) — it was an unrelated,
+  pre-existing hygiene fix (an undeclared transitive dependency) bundled into a feature
+  whose own spec says it must not depend on this repo's runtime. Logged separately as
+  ISS-006 instead.
+- Added `kb-template/examples/example-adr.md`, the missing fourth example for the `adr`
+  `type` value (FR-002 defines four `type` values; FR-014 previously only required
+  examples for three of them, with no stated reason for the gap). Updated FR-014 in
+  `specs/001-kb-template/spec.md` to require all four. Also cross-linked it from
+  `example-canonical-doc.md`'s `related:` field and body.
+
+**Files changed**: `pyproject.toml`, `uv.lock` (reverted), `docs/ISSUES.md` (added
+ISS-006), `specs/001-kb-template/spec.md` (FR-014), `kb-template/examples/example-adr.md`
+(new), `kb-template/examples/example-canonical-doc.md` (cross-link update).
+
+**Design decisions**:
+- Chose to add the missing example rather than just document the gap with a note —
+  kb-template is meant to be a generic, self-demonstrating scaffold, and all four `type`
+  values should get equal treatment. The new example itself notes that a project with its
+  own existing ADR convention (like this repo's `docs/adr/`) isn't obligated to migrate
+  onto kb-template's schema for ADRs specifically.
+
+**Validation**:
+- Confirmed `pyyaml` still resolves transitively after removing the explicit root
+  dependency (`import yaml` still succeeds); re-ran `pytest` — same 20 passed / 2
+  pre-existing failures (ISS-005) as before, zero change in behavior.
+- Re-ran the validator against the shipped `kb-template/` scaffold — now 14/14 files
+  pass (up from 13, with the new example included), exit 0.
+
+**Open items**: ISS-006 (root `pyproject.toml` pyyaml declaration) — logged, not fixed,
+tracked as separate future work.
+
+**Next safe action**: Commit and push these fixes to update PR #79, then it's ready for
+merge review.

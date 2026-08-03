@@ -7,7 +7,7 @@ authority: doctrine
 created: 2026-08-03
 updated: 2026-08-03
 canonical: true
-related: [example-raw-note, example-agent-adapter]
+related: [example-raw-note, example-agent-adapter, example-adr]
 ---
 
 # Example Canonical Document
@@ -33,8 +33,9 @@ content to check itself against and so a new adopter has something concrete to c
 ## Cross-references
 
 This document is `related:` to [[example-raw-note]] (an example of the earlier lifecycle
-stage this document might have come from) and [[example-agent-adapter]] (an example of a
-different document `type` serving a different purpose).
+stage this document might have come from), [[example-agent-adapter]] (an example of a
+different document `type` serving a different purpose), and [[example-adr]] (an example of
+recording a specific decision rather than general reference knowledge).
 
 ## Assumptions and exclusions
 

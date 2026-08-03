@@ -142,7 +142,7 @@ with a flipped status still inside `raw/` and confirming the validator does flag
 - **FR-013**: The scaffold MUST document authoring rules for raw notes: marked non-canonical,
   source context preserved, never treated as implementation authority.
 - **FR-014**: The scaffold MUST include one filled-in example document per `type` value
-  (`canonical-doc`, `raw-note`, `agent-adapter`) so the pattern is self-demonstrating.
+  (`canonical-doc`, `raw-note`, `agent-adapter`, `adr`) so the pattern is self-demonstrating.
 - **FR-015**: The scaffold MUST NOT import from or depend on any parent project's runtime
   source code.
 - **FR-016**: The scaffold MUST NOT contain project-specific canonical content — schema,
