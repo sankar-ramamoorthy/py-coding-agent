@@ -27,12 +27,12 @@ Principle IV, not copied when kb-template/ is extracted elsewhere).
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create the `kb-template/` directory skeleton: `kb-template/docs/`,
+- [X] T001 Create the `kb-template/` directory skeleton: `kb-template/docs/`,
       `kb-template/knowledge/raw/`, `kb-template/knowledge/processed/`,
       `kb-template/knowledge/topics/`, `kb-template/knowledge/index/`,
       `kb-template/examples/`, `kb-template/validator/`
-- [ ] T002 Create `kb-template/pyproject.toml` declaring `pyyaml` as its only dependency
-- [ ] T003 [P] Add an explicit `pyyaml` dependency to the root `pyproject.toml` and run
+- [X] T002 Create `kb-template/pyproject.toml` declaring `pyyaml` as its only dependency
+- [X] T003 [P] Add an explicit `pyyaml` dependency to the root `pyproject.toml` and run
       `uv lock` to refresh `uv.lock` (already used transitively by `py_mono/skill/validator.py`,
       `py_mono/skill/base.py`, `py_mono/playbook/playbookregistry.py` — now declared)
 
@@ -44,10 +44,10 @@ Principle IV, not copied when kb-template/ is extracted elsewhere).
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Define the front-matter schema as data in `kb-template/validator/schema.py`
+- [X] T004 Define the front-matter schema as data in `kb-template/validator/schema.py`
       (required fields, `type`/`status`/`authority` enum values, `canonical` bool,
       `related` list) per `data-model.md`
-- [ ] T005 [P] Create `kb-template/validator/__init__.py` (empty package init)
+- [X] T005 [P] Create `kb-template/validator/__init__.py` (empty package init)
 
 **Checkpoint**: Schema definition exists — user story implementation can now begin
 
@@ -63,34 +63,34 @@ the four lifecycle folders, and the index files are present, readable, and self-
 
 ### Implementation for User Story 1
 
-- [ ] T006 [P] [US1] Write `kb-template/README.md` — what the scaffold is, how to copy it
+- [X] T006 [P] [US1] Write `kb-template/README.md` — what the scaffold is, how to copy it
       elsewhere, and a quickstart pointer to running the validator
-- [ ] T007 [P] [US1] Write `kb-template/docs/schema.md` — human-readable documentation of
+- [X] T007 [P] [US1] Write `kb-template/docs/schema.md` — human-readable documentation of
       the schema defined in `kb-template/validator/schema.py` (T004), single source of truth
       per spec FR-001
-- [ ] T008 [P] [US1] Write `kb-template/docs/promotion.md` — the promotion rule (status flip
+- [X] T008 [P] [US1] Write `kb-template/docs/promotion.md` — the promotion rule (status flip
       AND physical move out of `raw/`, never a silent edit) per spec FR-007
-- [ ] T009 [P] [US1] Write `kb-template/docs/authoring-rules.md` — canonical-document rules
+- [X] T009 [P] [US1] Write `kb-template/docs/authoring-rules.md` — canonical-document rules
       (front matter required, status/authority identified, cross-link related docs, record
       assumptions/exclusions, distinguish facts/rules/proposals/examples, no silent
       promotion) and raw-note rules (marked non-canonical, preserve source context, never
       treated as implementation authority) per spec FR-012/FR-013
-- [ ] T010 [P] [US1] Write `kb-template/knowledge/raw/README.md` — explains the raw stage
-- [ ] T011 [P] [US1] Write `kb-template/knowledge/processed/README.md` — explains the
+- [X] T010 [P] [US1] Write `kb-template/knowledge/raw/README.md` — explains the raw stage
+- [X] T011 [P] [US1] Write `kb-template/knowledge/processed/README.md` — explains the
       processed stage
-- [ ] T012 [P] [US1] Write `kb-template/knowledge/topics/README.md` — explains the topics
+- [X] T012 [P] [US1] Write `kb-template/knowledge/topics/README.md` — explains the topics
       (canonical) stage
-- [ ] T013 [P] [US1] Write `kb-template/knowledge/index/README.md` — navigation entrypoint
+- [X] T013 [P] [US1] Write `kb-template/knowledge/index/README.md` — navigation entrypoint
       for the knowledge base
-- [ ] T014 [P] [US1] Write `kb-template/knowledge/index/runtime-context-map.md` — routes a
+- [X] T014 [P] [US1] Write `kb-template/knowledge/index/runtime-context-map.md` — routes a
       task category to the documents relevant to it, per spec FR-006
-- [ ] T015 [P] [US1] Write `kb-template/examples/example-canonical-doc.md` — filled-in
+- [X] T015 [P] [US1] Write `kb-template/examples/example-canonical-doc.md` — filled-in
       example, `type: canonical-doc`, `status: canonical`, living under `knowledge/topics/`
       conventions (physically placed in `examples/` for the shipped template, cross-linking
       the other two examples via `[[wikilinks]]`)
-- [ ] T016 [P] [US1] Write `kb-template/examples/example-raw-note.md` — filled-in example,
+- [X] T016 [P] [US1] Write `kb-template/examples/example-raw-note.md` — filled-in example,
       `type: raw-note`, `status: draft`, `canonical: false`
-- [ ] T017 [P] [US1] Write `kb-template/examples/example-agent-adapter.md` — filled-in
+- [X] T017 [P] [US1] Write `kb-template/examples/example-agent-adapter.md` — filled-in
       example, `type: agent-adapter`
 
 **Checkpoint**: At this point, User Story 1 is fully functional and testable independently —
@@ -111,7 +111,7 @@ a specific, correct message and non-zero exit).
 
 > Write these tests FIRST; ensure they FAIL before implementation (T019–T021 don't exist yet)
 
-- [ ] T018 [US2] Write `tests/kb_template/test_validate.py` covering: a valid document
+- [X] T018 [US2] Write `tests/kb_template/test_validate.py` covering: a valid document
       passes; a document missing a required field fails naming that field; a document with
       an invalid enum value (`type`, `status`, or `authority`) fails naming the value and the
       allowed set; a document with a non-list `related` field fails; a document with an
@@ -120,19 +120,21 @@ a specific, correct message and non-zero exit).
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Implement front-matter extraction (parse between `---` delimiters,
+- [X] T019 [US2] Implement front-matter extraction (parse between `---` delimiters,
       `yaml.safe_load`, catch `yaml.YAMLError`) and schema validation against T004's
       `schema.py` in `kb-template/validator/validate.py`
-- [ ] T020 [US2] Implement wikilink extraction (regex `\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]`
+- [X] T020 [US2] Implement wikilink extraction (regex `\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]`
       over document bodies) and case-insensitive filename-stem resolution against a
-      whole-tree index in `kb-template/validator/validate.py` (depends on T019)
-- [ ] T021 [US2] Implement the `ValidationResult` aggregator, per-file/summary console
+      whole-tree index in `kb-template/validator/validate.py` (depends on T019) — also
+      strips fenced/inline code spans before matching, so illustrative `[[example]]`
+      syntax in prose isn't mistaken for a real link (discovered during T023 verification)
+- [X] T021 [US2] Implement the `ValidationResult` aggregator, per-file/summary console
       output, and `argparse` CLI entry point (positional `root`, defaults to own parent dir)
       with the exit codes from `contracts/validator-cli.md` in
       `kb-template/validator/validate.py` (depends on T019, T020)
-- [ ] T022 [P] [US2] Write `kb-template/validator/README.md` documenting the CLI invocation
+- [X] T022 [P] [US2] Write `kb-template/validator/README.md` documenting the CLI invocation
       and what each check covers
-- [ ] T023 [US2] Run `pytest tests/kb_template/test_validate.py -v` and confirm all schema
+- [X] T023 [US2] Run `pytest tests/kb_template/test_validate.py -v` and confirm all schema
       and wikilink test cases from T018 pass
 
 **Checkpoint**: At this point, User Stories 1 AND 2 both work independently — the validator
@@ -153,17 +155,17 @@ canonical` (no violation reported); validate a document still in `knowledge/raw/
 
 > Write these tests FIRST; ensure they FAIL before implementation (T025 doesn't exist yet)
 
-- [ ] T024 [US3] Add promotion-rule test cases to `tests/kb_template/test_validate.py`: a
+- [X] T024 [US3] Add promotion-rule test cases to `tests/kb_template/test_validate.py`: a
       document under `knowledge/raw/` with `status: canonical` or `status: active` fails
       with a promotion-rule error naming the file and its path; the same document moved to
       `knowledge/topics/` passes
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] Implement the promotion-rule check (status `canonical`/`active` AND path
+- [X] T025 [US3] Implement the promotion-rule check (status `canonical`/`active` AND path
       under `knowledge/raw/` → error) in `kb-template/validator/validate.py`, integrated into
       the `ValidationResult` produced by T021 (depends on T019, T021)
-- [ ] T026 [US3] Run `pytest tests/kb_template/test_validate.py -v` and confirm all
+- [X] T026 [US3] Run `pytest tests/kb_template/test_validate.py -v` and confirm all
       promotion-rule test cases from T024 pass
 
 **Checkpoint**: All three user stories are independently functional — the validator fully
@@ -175,18 +177,29 @@ implements schema, wikilink, and promotion-rule checks (SC-002 through SC-005).
 
 **Purpose**: Repo-wide regression checks and end-to-end proof the shipped scaffold works
 
-- [ ] T027 [P] Run `python -m compileall -q py_mono skills kb_template` — repo-wide syntax
-      gate; also re-verifies `docs/ISSUES.md` ISS-001 (audit finding C-01)
-- [ ] T028 Run `pytest` (full suite) at the repo root — confirm nothing existing regressed
-- [ ] T029 Run `uv run --project kb-template python -m validator.validate kb-template` from
-      the repo root — must exit 0, proving the shipped scaffold (examples + index files) is
-      internally self-consistent (SC-002, quickstart.md Scenario 1)
-- [ ] T030 Manually execute quickstart.md Scenarios 2–6 (missing field, invalid enum, broken
-      wikilink, promotion violation, portability copy to a scratch directory outside the
-      repo) and confirm each fails or passes exactly as documented
-- [ ] T031 Update `docs/ISSUES.md` (close ISS-001 if T027 confirms it, mark ISS-004 done),
-      and fill in `docs/SESSION_LOG.md`, `docs/CURRENT_FOCUS.md`, `docs/NEXT_ACTIONS.md` with
-      the real end-of-session state per AGENTS.md's Session Completion section
+- [X] T027 [P] Run `python -m compileall -q py_mono skills kb-template` — repo-wide syntax
+      gate; also re-verifies `docs/ISSUES.md` ISS-001 (audit finding C-01). Exit 0 — ISS-001
+      confirmed fixed. (Path corrected from `kb_template` to `kb-template` — the actual
+      directory name uses a hyphen.)
+- [X] T028 Run `pytest` (full suite) at the repo root — confirm nothing existing regressed.
+      Found 3 pre-existing failures unrelated to this branch (1 collection error in
+      `tests/test_listallpy_skill.py`, 2 assertion failures in `tests/tools/test_create_tool.py`)
+      — confirmed pre-existing by reproducing identically with this branch's changes
+      stashed. Logged as ISS-005. All 15 new `tests/kb_template/` tests pass; all
+      pre-existing `tests/test_skill_approval.py` tests still pass — zero regressions
+      introduced by this feature.
+- [X] T029 Run the validator against the shipped scaffold, both invocation styles — must
+      exit 0, proving the shipped scaffold is internally self-consistent (SC-002) and truly
+      standalone-portable (SC-004, quickstart.md Scenario 1/6). Required adding
+      `[tool.setuptools.packages.find]` to `kb-template/pyproject.toml` (setuptools flat-layout
+      auto-discovery otherwise errors on multiple top-level dirs — `knowledge/`, `validator/`)
+- [X] T030 Manually executed quickstart.md Scenarios 2–5 (missing field, invalid enum, broken
+      wikilink, promotion violation) against scratch copies — each failed with the specific,
+      correct message and exit code 1 documented in quickstart.md
+- [ ] T031 Update `docs/ISSUES.md` (close ISS-001, mark ISS-004 done, add ISS-005 for the
+      pre-existing test failures discovered in T028), and fill in `docs/SESSION_LOG.md`,
+      `docs/CURRENT_FOCUS.md`, `docs/NEXT_ACTIONS.md` with the real end-of-session state per
+      AGENTS.md's Session Completion section
 
 ---
 
