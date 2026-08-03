@@ -22,6 +22,17 @@ Follow existing Python style: 4-space indentation, snake_case for functions/modu
 ## Commit & Pull Request Guidelines
 Recent history uses short, imperative commit messages such as `added playbook` and `fixed issue with generate-skill`. Keep commits focused and descriptive; prefer one concern per commit. PRs should summarize behavior changes, list affected areas, link any issue or ADR, and include terminal output or screenshots when CLI behavior changes.
 
+## Feature Planning with Spec Kit
+For new features, use Spec Kit's structured workflow before writing code: `/speckit-specify`
+(Claude Code) or `$speckit-specify` (Codex CLI) to draft a spec, then `/speckit-plan` and
+`/speckit-tasks`. Artifacts land in `specs/<NNN>-<slug>/` (spec.md, plan.md, tasks.md), scoped
+to a single feature.
+- Use Spec Kit specs for planning/building an individual feature.
+- Use `docs/adr/` (freeform `## Status/Context/Decision/Consequences`) for standing
+  architecture decisions that outlive any one feature.
+- `.specify/memory/constitution.md` mirrors this file's Agent Operating Constraints and
+  Protected Areas for Spec Kit's own planning steps — keep the two in sync if either changes.
+
 ## Security & Configuration Tips
 Do not commit live secrets. Start from `.env.example`, keep API keys in environment variables, and use `LLM_MASTER_KEY` for encrypted key storage support. Treat `workspace/` as the only safe execution area for generated files.
 
