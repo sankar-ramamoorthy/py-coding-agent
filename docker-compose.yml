@@ -9,10 +9,10 @@ services:
     ports:
       - "5678:5678"
     volumes:
-      - .:/app       
+      - .:/app:ro
       - ./workspace:/workspace
       - ./dynamic_tools:/app/dynamic_tools
-      - ./skills:/app/skills    
+      - ./skills:/app/skills
     environment:
       - LLM_MASTER_KEY=${LLM_MASTER_KEY}
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama-auto}
@@ -24,6 +24,8 @@ services:
       - OLLAMA_LOCAL_MODEL=${OLLAMA_LOCAL_MODEL:-Qwen3:4b}
       - LITELLM_MODEL=${LITELLM_MODEL:-groq/qwen/qwen3-32b}
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - ENABLE_SHELL_TOOL=${ENABLE_SHELL_TOOL:-false}
+      - ADDITIONAL_ALLOWED_PATHS=${ADDITIONAL_ALLOWED_PATHS:-}
       - DATETIME_MCP_URL=http://datetime-mcp:50051/mcp
     depends_on:
       - datetime-mcp

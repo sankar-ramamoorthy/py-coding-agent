@@ -17,7 +17,7 @@ Environment Variables:
 
 from typing import Optional
 
-from py_mono.config import LLM_PROVIDER
+from py_mono.config import LLM_PROVIDER, ENABLE_SHELL_TOOL
 from py_mono.agent.agent import Agent
 from py_mono.session.session_manager import SessionManager
 from py_mono.tools.read_file import read_tool
@@ -78,17 +78,32 @@ def load_skills() -> SkillRegistry:
     return registry
 
 
-def main():
-    # Base tools
-    base_tools = [
+def build_base_tools(enable_shell: Optional[bool] = None) -> list:
+    """
+    Assemble the base (always-available-unless-gated) tool set.
+
+    The shell tool is opt-in: it is included only when ENABLE_SHELL_TOOL is
+    truthy in the environment (or when enable_shell is explicitly passed,
+    which overrides the environment — used by tests to avoid module-reload
+    fragility). All other base tools are unconditional, as before.
+    """
+    tools = [
         read_tool,
         write_tool,
         edit_tool,
-        shell_tool,
         uv_tool,
         create_tool_tool,
         list_files_tool,
     ]
+    effective_enable_shell = enable_shell if enable_shell is not None else ENABLE_SHELL_TOOL
+    if effective_enable_shell:
+        tools.append(shell_tool)
+    return tools
+
+
+def main():
+    # Base tools
+    base_tools = build_base_tools()
 
     # Dynamic tools
     dynamic_tools = load_dynamic_tools()
