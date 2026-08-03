@@ -432,6 +432,22 @@ Current reference skills
 
 ---
 
+## Development & Contributing
+
+This repo is developed using both **Claude Code** and **Codex CLI** as AI coding assistants,
+alongside human contributors — commits aren't individually attributed to a specific AI tool.
+
+- Read [`AGENTS.md`](./AGENTS.md) first — it's the authoritative source for project structure,
+  build/test commands, coding conventions, and operating constraints for any contributor,
+  human or AI. [`CLAUDE.md`](./CLAUDE.md) just points Claude Code at it.
+- New features are planned with [Spec Kit](https://github.com/github/spec-kit) (see
+  [ADR-019](./docs/adr/ADR-019-spec-driven-development-with-spec-kit.md)):
+  `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` from Claude
+  Code, or the equivalent `$speckit-*` commands from Codex CLI. Feature artifacts land in
+  `specs/<NNN>-<slug>/`; standing architecture decisions stay in `docs/adr/`.
+
+---
+
 ## License
 
 MIT License
