@@ -25,7 +25,18 @@ LiteLLM (optional, set LLM_PROVIDER=litellm):
     ANTHROPIC_API_KEY   — if using Anthropic
 
 Workspace:
-    WORKSPACE_ROOT      — path to sandboxed workspace (default: /workspace)
+    WORKSPACE_ROOT           — path to sandboxed workspace (default: /workspace)
+    ADDITIONAL_ALLOWED_PATHS — comma-separated list of extra directories, beyond
+                               WORKSPACE_ROOT, that file tools may access. Empty by
+                               default — nothing beyond the workspace is accessible
+                               until explicitly configured here.
+
+Shell tool:
+    ENABLE_SHELL_TOOL   — 'true'/'1'/'yes'/'on' to enable the shell tool (default: false,
+                          disabled). The shell tool is NOT a content sandbox — enabling it
+                          grants the agent shell command execution with the same reach it
+                          has always had (filtered only by a best-effort blocklist, not
+                          confined to the workspace). Only enable in a trusted environment.
 """
 
 import os
@@ -44,3 +55,13 @@ LITELLM_MODEL = os.getenv("LITELLM_MODEL", "groq/llama-3.3-70b-versatile")
 
 
 WORKSPACE_ROOT = Path(os.getenv("WORKSPACE_ROOT", "/workspace")).resolve()
+
+_additional_paths_raw = os.getenv("ADDITIONAL_ALLOWED_PATHS", "")
+ADDITIONAL_ALLOWED_PATHS = [
+    Path(p.strip()).resolve() for p in _additional_paths_raw.split(",") if p.strip()
+]
+
+# Shell tool gating
+ENABLE_SHELL_TOOL = os.getenv("ENABLE_SHELL_TOOL", "false").strip().lower() in (
+    "1", "true", "yes", "on",
+)
