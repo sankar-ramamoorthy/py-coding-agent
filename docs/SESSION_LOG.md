@@ -180,3 +180,75 @@ merge review.
 **Next safe action**: Review the `ollama-dual-backend` branch's 2 commits (plus this
 session-doc commit), then push and open a PR into `main` when ready. Separately, decide
 whether ISS-002/ISS-003 (the original C-02/C-03 security findings) are next.
+
+---
+
+## 2026-08-03 — Fix workspace sandbox escape (ISS-002)
+**Issue**: ISS-002
+
+**Scope completed**:
+- Registered/updated `ISS-002`, ran the third full Spec Kit cycle (4 user stories):
+  `specs/003-fix-workspace-sandbox/{spec,plan,research,data-model,quickstart}.md`,
+  `contracts/path-and-shell-contract.md`, `checklists/requirements.md`, `tasks.md`
+  (19 tasks).
+- Fixed `resolve_safe_path` in `py_mono/utils/path_utils.py`: replaced the string-prefix
+  check with real path containment (`Path.is_relative_to`), checked against
+  `WORKSPACE_ROOT` plus a new, empty-by-default `ADDITIONAL_ALLOWED_PATHS` allowlist
+  (`py_mono/config.py`) — fixes all four existing file-tool callers with no per-tool
+  changes.
+- Gated the shell tool behind a new `ENABLE_SHELL_TOOL` opt-in (default false) via an
+  extracted, testable `build_base_tools()` in `py_mono/main.py`; added a 30s subprocess
+  timeout and corrected the tool's description to state plainly it's a best-effort
+  blocklist, not a sandbox (`py_mono/tools/shell.py`).
+- Changed `docker-compose.yml`'s `.:/app` mount to read-only, added the two new env vars
+  there and to `.env.example`.
+- Corrected `docs/adr/ADR-001-safe-execution-of-tools.md`'s claims to match the fixed,
+  real behavior; Status `Proposed` → `Accepted`.
+- Added `tests/utils/test_path_utils.py` (9 cases, 1 skipped on `win32`) and
+  `tests/tools/test_shell.py` (16 cases).
+
+**Files changed**: See commits `71a9ffa` (issue + Spec Kit artifacts), `ad8eb20`
+(implementation) on branch `fix-workspace-sandbox`. Also this commit's session-doc updates.
+
+**Design decisions**:
+- Both original bugs were live-demonstrated against the real, pre-fix code during planning
+  (not just read about) — `resolve_safe_path('../workspace_evil')` was confirmed to
+  incorrectly accept a sibling-directory escape, and the shell tool was confirmed to run
+  `ls /` and `cat /etc/os-release` with zero restriction. This grounded every design
+  decision in observed, not assumed, behavior.
+- Explicit user sign-off obtained on the one real behavior change: shell disabled by
+  default rather than hardened-but-left-on, after walking through the trade-off directly
+  (the user confirmed they'll set `ENABLE_SHELL_TOOL=true` themselves and specifically
+  wanted confirmation that enabling it doesn't reduce its reach vs. today).
+- Added `ADDITIONAL_ALLOWED_PATHS` at the user's explicit request, mid-session, as a
+  deliberate, empty-by-default escape hatch — distinguishes "access granted on purpose"
+  from the accidental access the original bug provided.
+- `build_base_tools(enable_shell: Optional[bool] = None)` chosen over
+  `importlib.reload()`-based env-var testing for `main.py`'s tool assembly — simpler and
+  avoids module-reload fragility, at the cost of one extra parameter.
+
+**Validation**:
+- `python -m compileall -q py_mono` — exit 0.
+- `pytest` (full suite, excluding the pre-existing broken `test_listallpy_skill.py`
+  collection) — 71 passed, 1 skipped (Windows symlink test, real coverage lives in the
+  Linux container), 2 pre-existing failures (`ISS-005`, confirmed unaffected), 0
+  regressions.
+- Real, non-mocked verification inside the actual running container (rebuilt with the new
+  mount): the audit's own literal probe now correctly raises; `shell` confirmed absent by
+  default and present with `ENABLE_SHELL_TOOL=true`; a `sleep 60` command was terminated at
+  exactly 30.0s with the timeout message; `ls /` and `cat /etc/os-release` still succeed
+  with shell enabled (reach genuinely unchanged, not narrowed); writes to `/workspace`,
+  `/app/dynamic_tools`, `/app/skills` all still succeed and `uv pip install --system` still
+  works; a direct write to `/app/py_mono/...` now fails with
+  `[Errno 30] Read-only file system` (confirming the mount fix actually took effect).
+
+**Open items**:
+- ISS-003 (skills/dynamic tools executing code before approval) — untouched, deliberately
+  out of scope for this branch, a distinct issue.
+- ISS-005, ISS-006 — pre-existing, unrelated, not fixed here.
+- Branch `fix-workspace-sandbox` has not been pushed or opened as a PR — left ready locally.
+
+**Next safe action**: Review the `fix-workspace-sandbox` branch's 2 commits (plus this
+session-doc commit), then push and open a PR into `main` when ready. With C-01/C-02 both
+now addressed, ISS-003 (C-03) is the last of the original three critical audit findings
+still open.

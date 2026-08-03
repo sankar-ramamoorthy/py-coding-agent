@@ -1,24 +1,24 @@
 # Current Focus
 
 ## Active branch
-`ollama-dual-backend` — implementation complete and verified against real backends,
-awaiting review before push/PR.
+`fix-workspace-sandbox` — implementation complete and verified against the real running
+container, awaiting review before push/PR.
 
 ## What was just finished
-`ISS-007`: dual Ollama backend selection (local laptop + remote GPU desktop over
-Tailscale), with the remote backend preferred by default, automatic fallback to local,
-explicit override for either, and runtime model switching. See `docs/SESSION_LOG.md`'s
-2026-08-03 "Dual Ollama backend selection" entry for the full completion report.
+`ISS-002`: the `/workspace` sandbox escape (audit finding C-02) is fixed. Real path
+containment replaces the string-prefix bug, a deliberate empty-by-default
+`ADDITIONAL_ALLOWED_PATHS` allowlist exists for granting extra access on purpose, the shell
+tool is now an explicit opt-in with a timeout, and the dev container's source mount is
+read-only. See `docs/SESSION_LOG.md`'s 2026-08-03 "Fix workspace sandbox escape" entry.
 
 ## Why
-The user's local machine is too slow for practical inference; a separate GPU-equipped
-desktop is available but not always on. This lets py-coding-agent use whichever backend
-is actually up, without manual reconfiguration, while still allowing explicit control.
+The 2026-08-02 security audit found the claimed workspace sandbox didn't actually hold —
+confirmed live during this session by reproducing both bugs against the real, pre-fix code.
 
 ## Not being worked on right now (explicitly out of scope)
-- ISS-002 / ISS-003 (sandbox/execution security issues, formerly audit C-02/C-03) — still
-  not started, per the user's original "even before fixing C-01 through C-03" framing
+- ISS-003 (skills/dynamic tools executing code before approval, audit C-03) — the last of
+  the three original critical findings still open
 - ISS-005 (pre-existing, unrelated test failures) — logged, not fixed
 - ISS-006 (pyyaml root dependency hygiene) — logged, not fixed
-- Wiring the LiteLLM path into dual-backend selection (out of scope for ISS-007, unrelated)
-- Any UI/rendering for backend status
+- True OS-level shell content sandboxing (separate restricted container, seccomp) —
+  explicitly deferred, materially larger project
