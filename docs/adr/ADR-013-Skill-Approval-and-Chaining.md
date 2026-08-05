@@ -6,6 +6,18 @@ Date: 2026-03-30
 
 **Status:** `accepted`
 
+**Implementation Notes: corrected 2026-08-03** — this ADR's stated policy ("proposed":
+Execution Allowed? No) was correct, but `SkillRegistry.load()`/`reload_skill()` did not
+actually enforce it: a proposed skill's `skill.py` executed at load time regardless of
+status (the module was `exec_module`'d before any status check ran). This was a gap
+between this ADR's intent and the implementation, not a policy change. Fixed in ISS-003
+(`specs/004-fix-skill-tool-approval-gate/`): load-time execution is now gated on both
+`status: approved` and a separate, tamper-evident approval-ledger record (a content hash
+of `skill.py` recorded at approval time, checked against the file's current content) —
+editing `skill.py` after approval invalidates it until explicitly re-approved. See that
+spec for the full mechanism; this ADR's policy statements below remain accurate and
+unchanged.
+
 ---
 
 ## Context

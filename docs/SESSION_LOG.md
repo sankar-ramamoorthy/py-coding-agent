@@ -250,5 +250,96 @@ whether ISS-002/ISS-003 (the original C-02/C-03 security findings) are next.
 
 **Next safe action**: Review the `fix-workspace-sandbox` branch's 2 commits (plus this
 session-doc commit), then push and open a PR into `main` when ready. With C-01/C-02 both
-now addressed, ISS-003 (C-03) is the last of the original three critical audit findings
+now addressed, ISS-003 (C-03) is the last of the original three critical audit findings.
+
+---
+
+## 2026-08-03 — Fix skill/dynamic-tool approval gate (ISS-003)
+**Issue**: ISS-003
+
+**Scope completed**:
+- Registered/updated `ISS-003`, ran the fourth full Spec Kit cycle (4 user stories):
+  `specs/004-fix-skill-tool-approval-gate/{spec,plan,research,data-model,quickstart}.md`,
+  `contracts/approval-gate-contract.md`, `checklists/requirements.md`, `tasks.md` (25 tasks).
+- Added `py_mono/skill/approval_ledger.py`: a new, separately-tracked approval ledger
+  (`skills/.approvals.json`) recording a content hash of each approved skill's `skill.py`.
+- `SkillRegistry.load()`/`reload_skill()` (`py_mono/skill/base.py`) now only `exec_module`
+  a skill when `status: approved` AND the ledger's hash matches current content — editing
+  `skill.py` after approval invalidates it until re-approved. `list_skills()` corrected so
+  a proposed/hash-mismatched skill with real code is reported accurately.
+- One-time auto-seed: the 8 pre-existing approved skills got ledger entries written
+  automatically on first run, explicitly logged as seed events, not reviews — zero
+  disruption.
+- `Agent._handle_skill_approve()` (`py_mono/agent/agent.py`) now re-validates the current
+  `skill.py` via `validate_skill_py()` before writing status/ledger — rejects outright if
+  it contains a known-unsafe pattern.
+- Added `ENABLE_DYNAMIC_TOOLS` (default false, `py_mono/config.py`), gated at both call
+  sites (`py_mono/main.py`, `agent.py`'s `_reload_dynamic_tools()`) — mirrors ISS-002's
+  `ENABLE_SHELL_TOOL` pattern exactly.
+- `load_dynamic_tools()` (`py_mono/tools/tool_loader.py`) and `create_tool()`
+  (`py_mono/tools/create_tool.py`) both run a new shared static safety check (forbidden
+  pattern + AST syntax validation) before `exec_module`/before writing to disk —
+  extracted `check_forbidden_patterns()` from `validator.py` as the single canonical
+  source, imported by both.
+- Corrected `docs/adr/ADR-013-Skill-Approval-and-Chaining.md` with an implementation-notes
+  section — the stated policy was already correct, the code just didn't enforce it.
+- Added `tests/test_skill_load_gating.py` (11 cases), `tests/tools/test_tool_loader.py`
+  (7 cases), and 2 new cases in `tests/tools/test_create_tool.py`.
+
+**Files changed**: See commits `d4cddfa` (issue + Spec Kit artifacts), `f542ccc`
+(implementation) on branch `fix-skill-tool-approval-gate`. Also this commit's session-doc
+updates.
+
+**Design decisions**:
+- The core bug was live-demonstrated against real, pre-fix code *before* any design work
+  began (a throwaway proposed skill with a module-level `print`, loaded via a real
+  `SkillRegistry` — the print fired immediately, confirming the audit's claim directly).
+  The same reproduction was re-run post-fix, inside the real container, to close the loop.
+- Explicit sign-off obtained on two real trade-offs before implementation: (1) a
+  content-hash ledger with auto-seeding, over a simpler status-only gate — chosen because
+  it also closes the "edit code and flip status together" tamper vector and gives the
+  separate M-01 finding (no approval audit trail) a side-effect fix; (2) dynamic tools
+  off by default via `ENABLE_DYNAMIC_TOOLS`, over static-validation-only — chosen because
+  it's the only option that actually matches the audit's "disable... until isolated
+  execution exists" recommendation, at the cost of the user's 5 existing local
+  `dynamic_tools/*.py` files needing one opt-in to keep working (same trade-off already
+  accepted for shell in ISS-002).
+- `SafeAgentTools`/`run_skill_safe` (invocation-time tool-access constraints) deliberately
+  left untouched — confirmed orthogonal, since they only apply to an already-approved,
+  already-loaded skill's `run()` call, not to whether its module code executes at all.
+- Discovered and fixed a real inconsistency while implementing: `_handle_skill_approve`
+  used the module-level `SKILLS_DIR` constant for file paths but needed
+  `self.skill_registry.skills_dir` for the ledger to support test isolation — fixed both
+  paths to consistently use the registry's own `skills_dir`, removing the now-unused
+  `SKILLS_DIR` import from `agent.py`.
+
+**Validation**:
+- `python -m compileall -q py_mono` — exit 0.
+- `pytest` (full suite, excluding the pre-existing broken `test_listallpy_skill.py`
+  collection) — 90 passed, 1 skipped (Windows symlink test, pre-existing convention from
+  ISS-002), 2 pre-existing failures (`ISS-005`, confirmed unaffected), 0 regressions.
+- Real, non-mocked verification inside the actual rebuilt container: the exact
+  originally-demonstrated bug reproduced and confirmed fixed (marker does not fire for a
+  proposed skill, does fire once approved); all 8 real skills auto-seeded and still load
+  (`skills/.approvals.json` now tracked with 8 `seeded: true` entries); `/approve`'s real
+  path (via `Agent._handle_skill_approve`, not mocked) rejects unsafe code and approves
+  clean code; editing an approved skill post-approval reverts it to not-loaded; the real
+  `dynamic_tools/` directory (6 files) loads 0 by default and the same 3 (of 6) with
+  `ENABLE_DYNAMIC_TOOLS=true` as pre-fix (confirmed via `git stash` comparison — the other
+  3 don't produce `Tool` instances for pre-existing, unrelated reasons, not new rejections
+  from the static validation).
+
+**Open items**:
+- `ISS-008` (full isolated-worker-with-RPC execution) — newly logged, explicitly deferred,
+  not started; the materially larger infrastructure item the audit's C-03 recommendation
+  also called for.
+- `ISS-005`, `ISS-006` — pre-existing, unrelated, not fixed here.
+- Branch `fix-skill-tool-approval-gate` has not been pushed or opened as a PR — left ready
+  locally.
+
+**Next safe action**: Review the `fix-skill-tool-approval-gate` branch's 2 commits (plus
+this session-doc commit), then push and open a PR into `main` when ready. With C-01, C-02,
+and C-03 all now addressed, all three original critical audit findings are resolved —
+remaining tracked work is `ISS-005`, `ISS-006` (both minor/pre-existing), and `ISS-008`
+(the deferred isolation project).
 still open.

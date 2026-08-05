@@ -170,19 +170,28 @@ def validate_skill_md(
     return SkillMdValidationResult(True, warnings, fixed_content)
 
 # ---------------------------------------------------------------------------
+# Shared forbidden-pattern check (reused by dynamic-tool validation too —
+# see py_mono/tools/tool_loader.py and py_mono/tools/create_tool.py — so
+# FORBIDDEN_PATTERNS has one canonical source instead of a second, drifting
+# copy for tools)
+# ---------------------------------------------------------------------------
+
+def check_forbidden_patterns(code: str) -> List[str]:
+    """Scan code text for forbidden patterns. Defense-in-depth only — does
+    not execute the code, and does not constitute full sandboxing."""
+    return [message for pattern, message in FORBIDDEN_PATTERNS if re.search(pattern, code)]
+
+# ---------------------------------------------------------------------------
 # skill.py validator
 # ---------------------------------------------------------------------------
 
 def validate_skill_py(code: str, skill_name: str) -> SkillPyValidationResult:
-    forbidden = []
     syntax_errors = []
     structure_errors = []
 
     code = _strip_markdown_fences(code)
 
-    for pattern, message in FORBIDDEN_PATTERNS:
-        if re.search(pattern, code):
-            forbidden.append(message)
+    forbidden = check_forbidden_patterns(code)
 
     try:
         tree = ast.parse(code)

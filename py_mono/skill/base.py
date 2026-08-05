@@ -24,6 +24,8 @@ from pathlib import Path
 import yaml
 from typing import Dict, List, Optional, TypedDict, TYPE_CHECKING
 
+from py_mono.skill import approval_ledger
+
 if TYPE_CHECKING:
     from py_mono.session.session_manager import SessionManager
     from py_mono.tools.tool import Tool
@@ -137,6 +139,7 @@ class SkillRegistry:
         self.skills_dir = skills_dir
         self._skills: Dict[str, Skill] = {}       # key = normalized name
         self._metadata: Dict[str, dict] = {}      # key = normalized name
+        self._has_code: Dict[str, bool] = {}      # key = normalized name; True if skill.py exists on disk
 
     # -------------------------
     # Normalization
@@ -151,10 +154,15 @@ class SkillRegistry:
     def load(self) -> None:
         self._skills.clear()
         self._metadata.clear()
+        self._has_code.clear()
 
         if not self.skills_dir.exists():
             logger.warning(f"Skills directory not found: {self.skills_dir}")
             return
+
+        ledger_path = approval_ledger.ledger_path_for(self.skills_dir)
+        ledger = approval_ledger.load_ledger(ledger_path)
+        ledger_dirty = False
 
         for skill_dir in sorted(self.skills_dir.iterdir()):
             if not skill_dir.is_dir():
@@ -172,14 +180,37 @@ class SkillRegistry:
             name = self._norm(raw_name)
             meta["name"] = name
             self._metadata[name] = meta
+            self._has_code[name] = skill_py.exists()
 
             if skill_py.exists():
-                skill = self._load_skill_py(skill_py, name)
-                if skill:
-                    self._skills[name] = skill
-                    logger.info(f"✅ Loaded skill '{name}' (status={meta.get('status','proposed')})")
+                status = str(meta.get("status", "proposed")).lower()
+
+                if status == "approved" and name not in ledger:
+                    # Pre-existing approved skill, ledger doesn't know it yet —
+                    # recognize its current state once, visibly marked as a
+                    # seed event rather than a real review.
+                    approval_ledger.record_approval(ledger, name, skill_py, seeded=True)
+                    ledger_dirty = True
+                    logger.info(
+                        f"🌱 Auto-seeded approval ledger for '{name}' "
+                        f"(pre-existing approved skill, not a review)"
+                    )
+
+                if status == "approved" and approval_ledger.is_approved(ledger, name, skill_py):
+                    skill = self._load_skill_py(skill_py, name)
+                    if skill:
+                        self._skills[name] = skill
+                        logger.info(f"✅ Loaded skill '{name}' (status=approved)")
+                else:
+                    logger.info(
+                        f"🔒 Skill '{name}' has skill.py but is not approved/ledger-matched "
+                        f"(status={meta.get('status','proposed')}) — not executed"
+                    )
             else:
                 logger.info(f"📋 Discovered skill spec '{name}' (SKILL.md only)")
+
+        if ledger_dirty:
+            approval_ledger.save_ledger(ledger, ledger_path)
 
     def reload_skill(self, skill_name: str) -> bool:
         name = self._norm(skill_name)
@@ -194,17 +225,38 @@ class SkillRegistry:
         meta = self._parse_skill_md(skill_md)
         meta["name"] = name
         self._metadata[name] = meta
+        self._has_code[name] = skill_py.exists()
 
         if skill_py.exists():
-            skill = self._load_skill_py(skill_py, name)
-            if skill:
-                self._skills[name] = skill
-                logger.info(f"🔄 Reloaded skill '{name}'")
-                return True
+            ledger_path = approval_ledger.ledger_path_for(self.skills_dir)
+            ledger = approval_ledger.load_ledger(ledger_path)
+            status = str(meta.get("status", "proposed")).lower()
+
+            if status == "approved" and name not in ledger:
+                approval_ledger.record_approval(ledger, name, skill_py, seeded=True)
+                approval_ledger.save_ledger(ledger, ledger_path)
+                logger.info(
+                    f"🌱 Auto-seeded approval ledger for '{name}' "
+                    f"(pre-existing approved skill, not a review)"
+                )
+
+            if status == "approved" and approval_ledger.is_approved(ledger, name, skill_py):
+                skill = self._load_skill_py(skill_py, name)
+                if skill:
+                    self._skills[name] = skill
+                    logger.info(f"🔄 Reloaded skill '{name}'")
+                    return True
+                else:
+                    self._skills.pop(name, None)
+                    logger.warning(f"Failed to reload skill '{name}'")
+                    return False
             else:
                 self._skills.pop(name, None)
-                logger.warning(f"Failed to reload skill '{name}'")
-                return False
+                logger.info(
+                    f"🔒 Skill '{name}' not approved/ledger-matched — unloaded "
+                    f"(status={meta.get('status','proposed')})"
+                )
+                return True
         else:
             self._skills.pop(name, None)
             logger.info(f"🔄 Reloaded spec-only skill '{name}'")
@@ -228,22 +280,17 @@ class SkillRegistry:
 
     def list_skills(self) -> List[ListedSkill]:
         results: List[ListedSkill] = []
-        for name, skill in self._skills.items():
-            meta = self._metadata.get(name, {})
+        for name, meta in self._metadata.items():
+            skill = self._skills.get(name)
             results.append({
                 "name": name,
-                "description": skill.description(),
+                "description": skill.description() if skill else meta.get("description", "(no description)"),
                 "status": meta.get("status", "proposed"),
-                "has_code": True,
+                # has_code reflects whether skill.py exists on disk, not whether
+                # it's currently loaded — a proposed or hash-mismatched skill
+                # still has code, it's just not executing yet (see ISS-003).
+                "has_code": self._has_code.get(name, False),
             })
-        for name, meta in self._metadata.items():
-            if name not in self._skills:
-                results.append({
-                    "name": name,
-                    "description": meta.get("description", "(no description)"),
-                    "status": meta.get("status", "proposed"),
-                    "has_code": False,
-                })
         return results
 
     def get_skill_md(self, name: str) -> Optional[str]:
