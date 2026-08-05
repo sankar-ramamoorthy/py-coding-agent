@@ -2,42 +2,42 @@
   "bug_fix": {
     "recorded_at": "2026-08-03T22:50:32.410241+00:00",
     "seeded": true,
-    "sha256": "ced786483961277b8256647f479cf5936956a538c32c4ef083888ecc416c29b4"
+    "sha256": "add8a08c96f6554b51473c241c225f30cf541fec8a13f1a26ecfd35f9a979132"
   },
   "create_skill_py": {
     "recorded_at": "2026-08-03T22:50:32.426928+00:00",
     "seeded": true,
-    "sha256": "5ed1c493b5411e629318ae804578899b57fe1f10387a3879a87b1eed077aa0eb"
+    "sha256": "3d8108ae54c8bea4fb30bf4432bdcfc71eadc5cdba032de253343629100123f2"
   },
   "doc_sync": {
     "recorded_at": "2026-08-03T22:50:32.439846+00:00",
     "seeded": true,
-    "sha256": "f50eddaadac6334b548c6bc8a4465cfc11b76d416a616be144324af5a6e1bc02"
+    "sha256": "f3ecd4382c2a3263094fcc5d20196e30b1597c076583aa77a4e3716bb0d3d207"
   },
   "generate_playbook": {
     "recorded_at": "2026-08-03T22:50:32.445530+00:00",
     "seeded": true,
-    "sha256": "2919b355c7afed5e1467ed3227e3ff3b23c8929c430b9940a9fb6479de4efd52"
+    "sha256": "361c4c0da63ad4ec54ac686b4833c030c2754205874b8865f98bd1e78d40d96a"
   },
   "generate_skill": {
     "recorded_at": "2026-08-03T22:50:32.447555+00:00",
     "seeded": true,
-    "sha256": "b88f0a2294d39bc7f4eb5bc6bc5c903f0efc93fc236567de856b645d9af357fd"
+    "sha256": "239da68e18ff51325d989b33360f1d9184e14dbacd5827ec513dd965a68735f1"
   },
   "hello": {
     "recorded_at": "2026-08-03T22:50:32.451948+00:00",
     "seeded": true,
-    "sha256": "b7a7e51b0869589b59a94a0a8fe37bf24580ca32ce5ede2bae28ba221fd68e2b"
+    "sha256": "f2adc1a590e20abafef53ac56d66f59f247396c7d93d16431bb20efc54e2d535"
   },
   "listallpy": {
     "recorded_at": "2026-08-05T17:33:41.659013+00:00",
     "seeded": false,
-    "sha256": "b45e3a516c2971a2596ce724e5d5df69bf31a02e76dcf232bacee783fee85ee6"
+    "sha256": "00e51d2cb162258b818fe4077796c10c0a677766b72e50d7cee3812950cb3937"
   },
   "refactor_extract_function": {
     "recorded_at": "2026-08-03T22:50:32.457745+00:00",
     "seeded": true,
-    "sha256": "2ff46632afbb0702571cf414ff3965e489957406e082afb0dd8c733bf9c5afd2"
+    "sha256": "98f08fa2fb99afb5c0a7bea5a42671af34f73f714df514c26fcd405b8f8e028b"
   },
   "scaffold_project": {
     "recorded_at": "2026-08-03T22:50:32.462058+00:00",

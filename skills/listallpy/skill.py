@@ -1,8 +1,6 @@
 from py_mono.skill.base import Skill, SkillContext
+import json
 import logging
-import re
-from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +14,13 @@ class ListallpySkill(Skill):
 
     def run(self, request: str, context: SkillContext) -> str:
         try:
-            workspace = Path(context.workspace_root)
-            py_files = [f for f in workspace.rglob("*.py") if f.is_file()]
-            file_names = [f.name for f in py_files]
+            list_files = context.agent_tools["list_files"]
+            entries = json.loads(list_files.run(path="."))
+            file_names = [
+                entry["name"]
+                for entry in entries
+                if entry.get("type") == "file" and entry.get("name", "").endswith(".py")
+            ]
             return "\n".join(file_names) or "No Python files found."
         except Exception as e:
             return f"[listallpy] Error: {e}"
