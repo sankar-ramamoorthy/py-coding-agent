@@ -52,7 +52,6 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-010 | open | M6 | Bare `/provider` silently falls through to the LLM | — |
 | ISS-011 | open | M6 | `generate_skill` output-quality gaps found dogfooding | — |
 | ISS-012 | open | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | — |
-| ISS-013 | open | M6 | Add lightweight per-run telemetry log | — |
 | ISS-014 | open | M6 | Add model/task fitness check | — |
 
 ## Closed Index
@@ -65,6 +64,7 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-004 | done | M5 | Add `kb-template/` portable knowledge-base scaffold | kb-template |
 | ISS-007 | done | M5 | Add dual Ollama backend selection with runtime model switching | ollama-dual-backend |
 | ISS-009 | done | M5 | `OllamaProvider` returns empty content for thinking-capable models | fix-ollama-thinking-response |
+| ISS-013 | done | M6 | Add lightweight per-run telemetry log | add-skill-run-telemetry |
 
 ---
 
@@ -160,16 +160,6 @@ issue's own section below the index, not in the index table — keeps the table 
   suite has known, undiagnosed red tests. `ISS-005` should land first.
 - **Fix:** not started — to be routed through Spec Kit
 
-### ISS-013 — Add lightweight per-run telemetry log
-- **Milestone:** M6
-- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope (originally described as a
-  shared dependency for M7, pulled forward into M6 since `ISS-014` needs it and M6 ships first)
-- **What:** a flat per-run log (`skill`, `provider`, `model`, `duration`, `success`) recorded
-  each time a skill runs. Minimal version only — Milestone 7's failure-driven evolution will
-  extend this same log rather than building a second one.
-- **Blocks:** `ISS-014` (fitness check has no data source without this)
-- **Fix:** not started — to be routed through Spec Kit
-
 ### ISS-014 — Add model/task fitness check
 - **Milestone:** M6
 - **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope
@@ -262,3 +252,18 @@ issue's own section below the index, not in the index table — keeps the table 
   wrong way before testing against the actual model from the bug report corrected the design —
   see `specs/005-fix-ollama-thinking-response/research.md` for the full empirical trail. Raw
   capture: `kb-template/knowledge/raw/brainstorm-20260805-ollama-thinking-empty-response.md`
+
+### ISS-013 — Add lightweight per-run telemetry log
+- **Milestone:** M6
+- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope (originally described as a
+  shared dependency for M7, pulled forward into M6 since `ISS-014` needs it and M6 ships first)
+- **Fix:** landed on branch `add-skill-run-telemetry`. New `py_mono/skill/telemetry.py`
+  (`log_skill_run`/`read_skill_runs`) appends one JSON line per skill run to
+  `telemetry/skill_runs.jsonl` (`skill`, `provider`, `model`, `duration_ms`, `success`,
+  `timestamp`); a write failure logs a warning and never breaks skill execution. Hooked into
+  `run_skill_safe` (`py_mono/skill/approval.py`) — the single existing chokepoint every skill
+  execution already passes through — via `try/finally`, so both successful and failed runs are
+  logged. `telemetry/` added to `.gitignore` (matching the existing `workspace/`/
+  `dynamic_tools/` pattern; operational data, not source). Added `tests/test_skill_telemetry.py`
+  (5 tests) and 3 new tests in `tests/test_skill_approval.py`. See
+  `specs/011-add-skill-run-telemetry/`

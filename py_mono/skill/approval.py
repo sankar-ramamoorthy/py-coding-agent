@@ -1,9 +1,11 @@
 # py_mono/skill/approval.py
 
+import time
 from collections.abc import Mapping
 from typing import Optional, Dict
 
 from py_mono.skill.base import SkillRegistry, SkillContext, Skill
+from py_mono.skill.telemetry import log_skill_run
 
 
 class ApprovalError(Exception):
@@ -139,11 +141,26 @@ def run_skill_safe(
     )
     safe_context.calling_skill = skill_name
 
+    provider_name = "<unknown>"
+    model_name = "<unknown>"
+    if context.session_manager is not None:
+        try:
+            active = context.session_manager.get_active_provider()
+            provider_name = active.__class__.__name__
+            model_name = getattr(active, "model_name", "<unknown>")
+        except Exception:
+            pass
+
+    start = time.monotonic()
+    success = False
     try:
         result = skill.run(request, safe_context)
+        success = True
+        return result
     except Exception as e:
         raise RuntimeError(
             f"Skill '{skill_name}' execution failed: {str(e)}"
         ) from e
-
-    return result
+    finally:
+        duration_ms = (time.monotonic() - start) * 1000
+        log_skill_run(skill_name, provider_name, model_name, duration_ms, success)

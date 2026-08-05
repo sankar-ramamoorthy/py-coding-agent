@@ -72,10 +72,11 @@ modes every session.
 5. **`ISS-012`** — minimal CI (`pytest` + `python -m compileall` on every PR). Motivated
    directly by pre-existing untriaged test failures; every regression check before this was a
    human manually running `pytest`. Depends on `ISS-005` landing first.
-6. **`ISS-013`** — lightweight per-run telemetry (minimal version): flat log (`skill`,
-   `provider`, `model`, `duration`, `success`). Originally scoped as an M7 shared dependency,
-   pulled forward into M6 since `ISS-014` needs it and M6 ships first; M7 extends this same log
-   rather than building a second one.
+6. **`ISS-013`** — **done.** `py_mono/skill/telemetry.py` logs `skill`/`provider`/`model`/
+   `duration_ms`/`success` to `telemetry/skill_runs.jsonl` on every `run_skill_safe` call.
+   Originally scoped as an M7 shared dependency, pulled forward into M6 since `ISS-014` needs it
+   and M6 ships first; M7 extends this same log rather than building a second one. See
+   [[ISSUES]] and `specs/011-add-skill-run-telemetry/`.
 7. **`ISS-014`** — model/task fitness check: warn before a heavy generation call if the
    configured model looks like a poor fit for structured output. The clearest "bug we hit →
    feature that prevents the next one" line of anything discussed this session — directly
