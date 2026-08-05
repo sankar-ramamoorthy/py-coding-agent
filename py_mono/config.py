@@ -44,6 +44,26 @@ Dynamic tools:
                           Python that executes on load — even with static forbidden-pattern
                           validation, this is not a full sandbox. Only enable in a trusted
                           environment.
+
+Ollama response budget and thinking control:
+    OLLAMA_ENABLE_THINKING — 'true'/'1'/'yes'/'on' to let thinking-capable models reason
+                          (default: false — thinking suppressed). Empirically, "think: false"
+                          genuinely eliminates reasoning (and its token cost) for models with
+                          native Ollama thinking support (e.g. qwen3.5:4b), but is silently
+                          ignored by at least one model in use here (lfm2.5-thinking:latest),
+                          which reasons regardless of this setting — see
+                          specs/005-fix-ollama-thinking-response/research.md.
+    OLLAMA_NUM_PREDICT  — max tokens Ollama may generate per call (default: 4096). Safety net
+                          for models that ignore OLLAMA_ENABLE_THINKING=false (see above) or
+                          when thinking is explicitly enabled — without it, a thinking-capable
+                          model can exhaust an unset/small budget entirely on internal reasoning
+                          and return empty content with done_reason "length".
+    OLLAMA_NUM_CTX      — Ollama context window size per call (default: 8192).
+    OLLAMA_REQUEST_TIMEOUT — HTTP read timeout in seconds for Ollama calls (default: 600).
+                          Raised from the prior hardcoded 300s: a thinking-capable model that
+                          doesn't honor OLLAMA_ENABLE_THINKING=false can take several minutes to
+                          exhaust OLLAMA_NUM_PREDICT tokens of reasoning even when this fix
+                          otherwise applies.
 """
 
 import os
@@ -77,3 +97,11 @@ ENABLE_SHELL_TOOL = os.getenv("ENABLE_SHELL_TOOL", "false").strip().lower() in (
 ENABLE_DYNAMIC_TOOLS = os.getenv("ENABLE_DYNAMIC_TOOLS", "false").strip().lower() in (
     "1", "true", "yes", "on",
 )
+
+# Ollama response budget and thinking control (see specs/005-fix-ollama-thinking-response/research.md)
+OLLAMA_ENABLE_THINKING = os.getenv("OLLAMA_ENABLE_THINKING", "false").strip().lower() in (
+    "1", "true", "yes", "on",
+)
+OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "4096"))
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
+OLLAMA_REQUEST_TIMEOUT = int(os.getenv("OLLAMA_REQUEST_TIMEOUT", "600"))
