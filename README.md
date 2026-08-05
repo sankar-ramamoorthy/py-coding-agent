@@ -291,31 +291,25 @@ Run normal tasks (all of these automatically use the currently active provider):
 ```
 
 ---
-## Built-in Skills
+## Skills Layer (Milestone 5)
 
-Skills are first-class workflows. Call them with `/skill <name>`. All follow ADR-016: they only use tools from the registry, never direct syscalls.
+Skills are first-class, approval-gated workflows, invoked with `/skill <name>`. All follow ADR-016: they only use tools from the registry, never direct syscalls, and only run once `status: approved` in their `SKILL.md`.
 
-| Skill | Purpose | Example |
-| --- | --- | --- |
-| `bug_fix` | Fix a bug from stack trace. Reads code, applies minimal patch, runs pytest, rolls back on failure | `/skill bug_fix KeyError:'user' file:src/auth.py line:42` |
-| `refactor_extract_function` | Extract code block into helper function. Preserves behavior + tests | `/skill refactor_extract_function file:src/foo.py start:42 end:48 name:calc_discount` |
-| `doc_sync` | Sync docstrings/README with actual code signatures using AST | `/skill doc_sync code:src/api.py docs:README.md target:readme` |
-| `generate_playbook` | LLM-generate a reasoning playbook .md with YAML front-matter for PlaybookRegistry | `/skill generate_playbook category:testing \| description:pytest guide \| keywords:test,pytest` |
-| `create_skill_py` | Meta-skill: compile SKILL.md → skill.py. Deterministic/LLM/hybrid modes | `/skill create_skill_py bug_fix --overwrite` |
-| `scaffold_project` | Bootstrap new Python project: pyproject.toml, src/, tests/ | `/skill scaffold_project name:myapp` |
-| `generate_skill` | Legacy: LLM-generate new skill from prompt. Use `create_skill_py` instead | `/skill generate_skill "docker build skill"` |
-| `hello` | Test skill. Verifies skill loading works | `/skill hello` |
+```
+/skill list                    → show all skills
+/skill help <skill_name>       → show SKILL.md for a skill
+/skill <skill_name> ...        → run an approved skill
+```
 
-### Common Flags
-Most skills support:
-- `dry_run:true` — Show diff/preview without writing files
-- `--overwrite` — Replace existing output file
+**Common flags:** `dry_run:true` (preview without writing) · `--overwrite` (replace existing output)
 
-### Skill vs Playbook
-- **Skill**: Executable workflow. Has `skill.py`, calls tools, writes files. Lives in `skills/`
-- **Playbook**: Reasoning guide. Markdown only, injected by `PlaybookRegistry`. Lives in `playbooks/`
+**Skill vs Playbook:**
+- **Skill** — executable workflow (`skill.py`), calls tools, writes files, gated by approval. Lives in `skills/`.
+- **Playbook** — reasoning guide, Markdown only, injected by `PlaybookRegistry`, not gated. Lives in `playbooks/`.
 
 Run `/clear` after creating new skills/playbooks to reload them.
+
+See [`README_Skills.md`](./README_Skills.md) for the skills-layer architecture (Reasoning / Orchestration / Execution layers, ADR-010 approval gate, and how this differs from Claude-style Markdown-only skills) and [`docs/skills.md`](./docs/skills.md) for the full per-skill reference (args, triggers, failure modes). Those files are the single source of truth for the skill list — it isn't duplicated here.
 
 ### Current Limitations
 
@@ -324,45 +318,7 @@ Run `/clear` after creating new skills/playbooks to reload them.
 * LLM may answer from stale memory instead of re‑reading files after edits  
 
 ---
-  ``` 
-  See `docs/README_Skills.md` for a full description of the skills layer and how it differs from Claude‑style Markdown‑only skills.
-  ```
-## Skills Layer (Milestone 5)
 
-The agent now supports a **skills layer** that lets you run predefined coding workflows via `/skill <name>`.
-
-### How skills work
-
-- Skills live under `skills/<skill_name>/`:
-  - `SKILL.md` — YAML front‑matter + human‑readable spec.
-  - `skill.py` — optional Python implementation.
-- They are discovered and registered by `SkillRegistry` at startup.
-- Skills are gated by `status: proposed` / `status: approved` (ADR‑010 review model).
-
-### Example commands
-
-```
-/skill list                    → show all skills
-/skill help <skill_name>       → show SKILL.md for a skill
-/skill <skill_name> ...        → run an approved skill
-
-Current reference skills
-
-    bug_fix — Fix a bug from a stack trace or error message.
-
-    refactor_extract_function — Extract a code block into a helper function.
-
-    doc_sync — (planned) Synchronize doc comments and user‑faced docs with code.
-```
-
-```
-| Aspect                | Claude‑style skills                                      |  py‑coding‑agent skills                                 |
-| --------------------- | -------------------------------------------------------- | ----------------------------------------------------------- |
-| Skill definition      | Markdown‑driven (SKILL.md / natural‑language steps)      | Markdown spec (SKILL.md) plus executable code (skill.py).   |
-| Where logic lives     | The LLM “reads the markdown and figures out how to act.” | We write explicit Python (run(...), tool calls, tests).    |
-| Runtime precision     | Flexible, LLM‑interpreted.                               | Deterministic, code‑defined behavior.                       |
-| Safety / review model | Often controlled by UI / toggles.                        | Explicit approval gate in YAML (status: proposed/approved). |
-```
 ### Roadmap
 
 **Milestone 1 (Core Agent) ✅**
@@ -400,14 +356,16 @@ Current reference skills
 * [ ] Full workflow testing  
 * [ ] Packaging  
 
+**Milestone 5 (Skills Layer) ✅**
+
+* [x] Skill framework + registry (`skill/`, `skills/`)  
+* [x] Approval gate (`status: proposed` / `status: approved`, ADR‑010)  
+* [x] Reference skills: `bug_fix`, `refactor_extract_function`, `doc_sync`, and others (see [`README_Skills.md`](./README_Skills.md))  
+* [x] Operator dry‑run mode for risky skills  
+
+*(Milestone 5 shipped ahead of Milestone 4 — the skills layer above is implemented and in active use; M4's polish items remain open.)*
+
 ---
-**Agent skills layer (Milestone 5)**:
-  - Implement reusable workflows via `/skill <name>`:
-    - `bug_fix` — fix bugs from error messages.
-    - `refactor_extract_function` — extract blocks into helper functions.
-    - `doc_sync` — keep doc comments and READMEs in sync with code.
-  - Gate execution with `status: proposed` / `status: approved` (ADR‑010).
-  - Allow operator‑approved dry‑run modes for risky skills.
 
 ### Future Enhancements (V2)
 

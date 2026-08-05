@@ -1,10 +1,3 @@
-Got it. Here’s `docs/skills.md` — full catalog with examples, args, constraints, and failure modes for your 6 approved skills.
-
-Create this file at `docs/skills.md` and link it from `README.md`.
-
----
-
-### *`docs/skills.md`*
 # Skill Catalog
 
 All skills are invoked via `/skill <name> [args] [flags]`.  
