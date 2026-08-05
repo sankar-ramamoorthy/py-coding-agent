@@ -316,7 +316,7 @@ Violation = skill rejected by code review.
 
 ## Current Skill Inventory
 
-Last updated: 2026-04-20
+Last updated: 2026-08-05
 
 | Skill | Status | Mode | Dry-run | Description |
 | --- | --- | --- | --- | --- |
@@ -328,6 +328,7 @@ Last updated: 2026-04-20
 | `scaffold_project` | approved | deterministic | no | Bootstrap pyproject.toml + src/ |
 | `generate_skill` | deprecated | llm | no | Use `create_skill_py` instead |
 | `hello` | approved | deterministic | no | Test stub |
+| `listallpy` | approved | deterministic | no | List `*.py` files in the workspace |
 
 ## Playbook vs Skill Cheat Sheet
 
