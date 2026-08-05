@@ -48,7 +48,8 @@ modes every session.
 | `ISS-006` — declare `pyyaml` as a direct dependency | Open, not started | Small, mechanical. See [[ISSUES]]. |
 | `ISS-010` — bare `/provider` falls through to the LLM | Open, not started | Small, well-scoped — usage-message fix in `py_mono/agent/agent.py`. See [[ISSUES]]. |
 | `ISS-011` — `generate_skill` fence-stripping + prompt-placeholder-leak fixes | Open, not started | Two code fixes (`py_mono/skill/validator.py`, `py_mono/skill/prompts.py`) plus one non-code investigation (`ollama ps`, possible CPU-bound/unoffloaded inference). See [[ISSUES]]. |
-| Model/task fitness check | Not yet filed | Warn before a heavy generation call if the configured model looks like a poor fit for structured output. The clearest "bug we hit → feature that prevents the next one" line of anything discussed this session — directly productizes the `ISS-009`/`ISS-011` lesson (thinking models reasoning verbosely/unreliably on template-filling tasks). |
+| Model/task fitness check | Not yet filed | Warn before a heavy generation call if the configured model looks like a poor fit for structured output. The clearest "bug we hit → feature that prevents the next one" line of anything discussed this session — directly productizes the `ISS-009`/`ISS-011` lesson (thinking models reasoning verbosely/unreliably on template-filling tasks). Needs the per-run log below to have anything to check "fitness" against — sequence it last within M6. |
+| Lightweight per-run telemetry (minimal version) | Not yet filed | Flat log (`skill`, `provider`, `model`, `duration`, `success`) — the fitness check above can't exist without it. Ship the minimal version here since M6 ships before M7 and the fitness check has no other source of data; Milestone 7 extends this same log for failure-driven evolution rather than building a second one. |
 
 ---
 
@@ -78,21 +79,34 @@ judgment) — which is the same philosophy as the existing hash-ledger approval 
 extended across more stages instead of one:
 
 ```
-Draft(SKILL.md) → Critique → Generate(skill.py) → Validate ──┐
-                                    ▲                         │ fail (capped)
-                                    └─────────────────────────┘
-                                                                │ pass
-                                                                ▼
-                                                            Propose → Approve → Run
+Draft(SKILL.md) → Critique → Generate(skill.py) → Validate → Test(smoke run) ──┐
+                                    ▲                                          │ fail (capped)
+                                    └──────────────────────────────────────────┘
+                                                                                 │ pass
+                                                                                 ▼
+                                                                             Propose → Approve → Run
 ```
 
 - **Critique** — static: does the spec violate ADR-016 tool constraints? Duplicate an existing
-  skill? Reuses `validate_skill_md`, doesn't invent a new checker.
+  skill? Reuses `validate_skill_md`, doesn't invent a new checker. **Scope, stated explicitly:**
+  this catches spec/policy violations — what's *written* — not content quality. It would not
+  have caught `ISS-011`'s leaked prompt-placeholder line, because that was the model treating
+  template instruction text as content to preserve, not a spec conflict. Don't credit this stage
+  later as "the thing that prevents another ISS-011" — it wouldn't have. Catching that class of
+  bug is what **Test** (below) is for.
 - **Validate** — reuses the existing `validate_skill_py` (AST + forbidden-pattern checks),
-  unchanged.
+  unchanged. Confirms the generated code is *safe*, not that it *works*.
+- **Test** — new. After Validate passes, run the generated skill once against a synthetic
+  trivial input before Propose, and surface pass/fail alongside the diff at Approve time. This
+  is the missing stage relative to the SDLC-graph pattern this is modeled on (which has Test as
+  distinct from Build): without it, the graph goes straight from static-safety-validated code to
+  human approval, with nothing checking the skill actually runs. This is also the stage that
+  would have a shot at catching content-level bugs like `ISS-011`'s, which Critique's static
+  checks structurally cannot.
 - **The fail-loop cap already half-exists**: `generate_skill` already retries once
   (`MAX_RETRIES = 1`) on validation failure. The extension is making that cap and the loop
-  explicit and reusable across stages, not inventing retry logic from scratch.
+  explicit and reusable across stages (now including Test), not inventing retry logic from
+  scratch.
 - **Approve** — the existing hash-ledger gate (`ISS-003`'s fix), unchanged. This graph doesn't
   touch the trust boundary, it just gives the stages before it more structure.
 
@@ -111,8 +125,9 @@ itself. Same state machine as first-creation, entered from a different edge.
 ### Shared dependency: lightweight telemetry
 
 Both M6's fitness check and this milestone's failure-driven evolution need the same thing — a
-flat per-run log (`skill`, `provider`, `model`, `duration`, `success`). Build it once, here, not
-twice in two different sessions.
+flat per-run log (`skill`, `provider`, `model`, `duration`, `success`). M6 ships first and
+already can't build its fitness check without this, so the minimal version is built there (see
+M6 table above). This milestone extends that same log rather than building a second one.
 
 ---
 
@@ -179,5 +194,7 @@ question above:
 - No git-native diff-review workflow for code changes (only for skills, per Milestone 7).
 - No sandboxed/isolated execution (`ISS-008`).
 - No test-driven iteration loop (agent verifying its own work against tests before requesting
-  approval).
-- No cost/token observability (folds into Milestone 7's shared telemetry item above).
+  approval) — Milestone 7's new **Test** stage (smoke-run before Propose) is a first, narrow
+  step toward this, not the full thing: one synthetic trivial case, not real test-driven
+  iteration.
+- No cost/token observability (folds into Milestone 6/7's shared telemetry item above).
