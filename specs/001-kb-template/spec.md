@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Add a self-contained, top-level kb-template/ directory: a portable, framework-agnostic knowledge-base scaffold (YAML front-matter + Obsidian-style markdown wikilinks) that other projects can copy via `cp -r` or `git subtree split`, so a documentation pattern already hand-built inconsistently across two unrelated projects (TradeForge-KnowledgeBase, AITrader) exists once, versioned, here. Must provide a canonical YAML front-matter schema, a raw/processed/topics folder lifecycle with an index and runtime-context-map, an explicit promotion rule, a standalone Python validator checking schema compliance and wikilink resolution, authoring-rules documentation, and one example per document type. Must not depend on this repo's runtime code or ship project-specific content. Out of scope: repo split, UI/rendering, migrating other projects onto the schema, wiring into this repo's own CI/pre-commit."
+**Input**: User description: "Add a self-contained, top-level kb-template/ directory: a portable, framework-agnostic knowledge-base scaffold (YAML front-matter + Obsidian-style markdown wikilinks) that other projects can copy via `cp -r` or `git subtree split`, so a documentation pattern already hand-built inconsistently across other unrelated projects exists once, versioned, here. Must provide a canonical YAML front-matter schema, a raw/processed/topics folder lifecycle with an index and runtime-context-map, an explicit promotion rule, a standalone Python validator checking schema compliance and wikilink resolution, authoring-rules documentation, and one example per document type. Must not depend on this repo's runtime code or ship project-specific content. Out of scope: repo split, UI/rendering, migrating other projects onto the schema, wiring into this repo's own CI/pre-commit."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -188,5 +188,5 @@ with a flipped status still inside `raw/` and confirming the validator does flag
   bracket syntax is reserved for in-body prose wikilinks only.
 - Integrating the validator into this repository's own CI/pre-commit is explicitly out of
   scope for this feature — the scaffold must merely be capable of being wired in elsewhere.
-- Splitting `kb-template/` into its own repository, and migrating TradeForge-KnowledgeBase
-  or AITrader onto this schema, are explicitly deferred to future, separate work.
+- Splitting `kb-template/` into its own repository, and migrating other internal
+  knowledge-base projects onto this schema, are explicitly deferred to future, separate work.
