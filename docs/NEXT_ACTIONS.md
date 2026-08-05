@@ -10,12 +10,19 @@ don't just delete — `SESSION_LOG.md` keeps the record.
 - [x] Fix Ollama thinking-model empty response (ISS-009) — merged, PR #86
 - [x] Verify end-to-end against real Ollama servers (both models this agent uses)
 - [x] File ISS-010 (bare `/provider` falls through to the LLM instead of showing usage) —
-      to be fixed later via Spec Kit, not fixed this session
-- [ ] Decide next: pick from `ISS-005`, `ISS-006`, `ISS-008`, `ISS-010`, the model-swap
-      follow-up noted in `docs/CURRENT_FOCUS.md`, or something new
+      merged, PR #87, to be fixed later via Spec Kit, not fixed this session
+- [x] File ISS-011 (three `generate_skill` output-quality gaps found dogfooding against
+      `qwen2.5-coder:7b-instruct-q5_K_M`) — to be fixed later via Spec Kit, not fixed this session
+- [ ] Decide next: pick from `ISS-005`, `ISS-006`, `ISS-008`, `ISS-010`, `ISS-011`, the
+      model-swap follow-up noted in `docs/CURRENT_FOCUS.md`, or something new
 - [ ] (Later, separate work) `ISS-010`: bare `/provider` (no argument) in
       `py_mono/agent/agent.py` should show a `Usage: /provider <provider> [model]` message
       instead of silently falling through to the LLM — route through Spec Kit
+- [ ] (Later, separate work) `ISS-011`: fix `generate_skill`'s asymmetric markdown-fence
+      stripping (`py_mono/skill/validator.py`'s `_strip_markdown_fences()`) and the leaked
+      template placeholder line (`py_mono/skill/prompts.py:90`); separately investigate
+      whether Ollama inference is CPU-bound/unoffloaded (`ollama ps`, not a code fix) —
+      route through Spec Kit
 - [ ] (Later, separate work) `ISS-008`: full isolated-worker-with-RPC execution for
       skills/dynamic tools (materially larger infrastructure project)
 - [ ] (Later, separate work) `ISS-005`: investigate the pre-existing `tests/test_listallpy_skill.py`
