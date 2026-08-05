@@ -46,11 +46,9 @@ issue's own section below the index, not in the index table — keeps the table 
 
 | ID | Status | Milestone | Title | Branch |
 | --- | --- | --- | --- | --- |
-| ISS-005 | open | M6 | Pre-existing test failures unrelated to current branch work | — |
 | ISS-006 | open | M6 | `pyyaml` used transitively but not declared as a direct dependency | — |
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
 | ISS-011 | open | M6 | `generate_skill` output-quality gaps found dogfooding | — |
-| ISS-012 | open | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | — |
 | ISS-013 | open | M6 | Add lightweight per-run telemetry log | — |
 | ISS-014 | open | M6 | Add model/task fitness check | — |
 
@@ -62,28 +60,15 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-002 | done | M5 | `/workspace` sandbox escape via path-check bypass | fix-workspace-sandbox |
 | ISS-003 | done | M5 | Skills/dynamic tools execute arbitrary code before approval | fix-skill-tool-approval-gate |
 | ISS-004 | done | M5 | Add `kb-template/` portable knowledge-base scaffold | kb-template |
+| ISS-005 | done | M6 | Pre-existing test failures unrelated to current branch work | fix-pre-existing-test-failures |
 | ISS-007 | done | M5 | Add dual Ollama backend selection with runtime model switching | ollama-dual-backend |
 | ISS-009 | done | M5 | `OllamaProvider` returns empty content for thinking-capable models | fix-ollama-thinking-response |
 | ISS-010 | done | M6 | Bare `/provider` silently falls through to the LLM | fix-bare-provider-command |
+| ISS-012 | done | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | add-minimal-ci |
 
 ---
 
 ## Open / Tracked — Detail
-
-### ISS-005 — Pre-existing test failures unrelated to current branch work
-- **Milestone:** M6 — prerequisite for `ISS-012` (CI can't be green-required with known red tests)
-- **Source:** discovered 2026-08-03 verifying `kb-template`
-- **What:**
-  - `tests/test_listallpy_skill.py` fails to collect (`ModuleNotFoundError: No module named
-    'skills'`)
-  - `tests/tools/test_create_tool.py` has 2 failing assertions
-    (`test_create_tool_writes_file_for_valid_name`, `test_create_tool_rejects_invalid_module_name`)
-    — behavior doesn't match test expectations
-- **Confirmed pre-existing** by reproducing identically with `kb-template`'s changes stashed
-- **Scope:** not fixed as part of `kb-template` — out of scope, unrelated concern per
-  Constitution Principle I
-- **Why it matters now:** blocks Milestone 6 CI from being green-required (see
-  `docs/ROADMAP_PLAN.md`) — can't gate merges on a suite with known, undiagnosed red tests
 
 ### ISS-006 — `pyyaml` used transitively but not declared as a direct dependency
 - **Milestone:** M6
@@ -137,15 +122,6 @@ issue's own section below the index, not in the index table — keeps the table 
      offload logs, not a code fix in this repo.
 - **Fix:** deferred — to be routed through Spec Kit per explicit instruction, not fixed inline
 
-### ISS-012 — Add minimal CI (`pytest` + `compileall` on every PR)
-- **Milestone:** M6
-- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope
-- **What:** there is currently no CI or pre-commit enforcement anywhere in this repo. Every
-  regression check this session was a human manually running `pytest`. Add a CI workflow that
-  runs `pytest` and `python -m compileall` on every PR.
-- **Depends on:** `ISS-005` — can't make CI green-required (block merges on failure) while the
-  suite has known, undiagnosed red tests. `ISS-005` should land first.
-- **Fix:** not started — to be routed through Spec Kit
 
 ### ISS-013 — Add lightweight per-run telemetry log
 - **Milestone:** M6
@@ -218,6 +194,35 @@ issue's own section below the index, not in the index table — keeps the table 
   validator, extracted before further cross-project knowledge-base drift accumulates. See
   `specs/001-kb-template/`
 
+### ISS-005 — Pre-existing test failures unrelated to current branch work
+- **Milestone:** M6 — prerequisite for `ISS-012` (CI can't be green-required with known red tests)
+- **Source:** discovered 2026-08-03 verifying `kb-template`
+- **Fix:** landed on branch `fix-pre-existing-test-failures`. Three independent, unrelated
+  failures:
+  1. `skills/listallpy/skill.py` bypassed `context.agent_tools` entirely, walking the real
+     filesystem directly via `Path(context.workspace_root).rglob("*.py")` — violated ADR-016
+     and defeated `tests/test_listallpy_skill.py`'s `list_files` mock. Fixed by routing through
+     `context.agent_tools["list_files"].run(path=".")` and filtering the returned JSON.
+  2. `skills/.approvals.json`'s hash-ledger gate (ADR-013/ISS-003) hashed raw on-disk bytes,
+     which git's `core.autocrlf` rewrites per checkout platform (CRLF on native Windows, LF on
+     Linux/CI/Docker) even for byte-identical tracked content — silently invalidating
+     `listallpy`'s approval. Verified systemic: 7 of 9 approved skills' ledger hashes would
+     already mismatch a Linux checkout of the same content, which would have broken almost
+     every skill's approval status the moment `ISS-012`'s CI ran. Fixed by normalizing
+     `\r\n` → `\n` in `approval_ledger.hash_file()` before hashing and regenerating
+     `skills/.approvals.json` under the corrected algorithm.
+  3. `py_mono/tools/create_tool.py` had two message/contract mismatches against its own tests
+     in `tests/tools/test_create_tool.py`, unrelated to the above: an inconsistent
+     invalid-name message and a success message missing the written file's path (both brought
+     in line with this module's own `"Error: ..."` convention and the sibling `write_file`
+     tool's path-inclusion convention; two stale tests updated to match the tool's actual,
+     already-relied-upon-elsewhere wrapped-`Tool`-schema contract).
+- **Tests:** added `tests/test_approval_ledger.py` (3 tests: CRLF/LF hash equivalence, approval
+  surviving a simulated re-checkout, a real content change still correctly invalidating
+  approval). Full suite: 104 passed, 1 skipped (pre-existing, unrelated Windows symlink-privilege
+  skip) — was 6 collection errors / 5 failures before. See
+  `specs/006-fix-pre-existing-test-failures/`
+
 ### ISS-007 — Add dual Ollama backend selection with runtime model switching
 - **Milestone:** M5
 - **Source:** 2026-08-03 session, user request
@@ -265,3 +270,17 @@ issue's own section below the index, not in the index table — keeps the table 
 - **Tests:** added `tests/test_special_commands.py` (5 tests: bare `/provider` recognized +
   shows usage, trailing-space-only unaffected, `/providers` unaffected, valid-argument switching
   unaffected). See `specs/008-fix-bare-provider-command/`
+
+### ISS-012 — Add minimal CI (`pytest` + `compileall` on every PR)
+- **Milestone:** M6
+- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope
+- **Fix:** landed on branch `add-minimal-ci`. Added `.github/workflows/ci.yml`: triggers on
+  `pull_request` and `push` to `main`, runs on `ubuntu-latest`, installs `uv`
+  (`astral-sh/setup-uv`), runs `uv sync --group dev`, `uv run pytest -q`, and
+  `uv run python -m compileall -q py_mono skills`
+- **Depended on:** `ISS-005` (fixed, `#96`) — validated locally by merging that fix into this
+  branch before adding CI, so the workflow's commands were confirmed green (104 passed, 1
+  skipped, compileall clean) rather than assumed
+- **Scope note:** adds the workflow only — making it *required* (branch protection blocking
+  merge on failure) is a separate, repo-owner-only GitHub settings change, intentionally not
+  done as part of this item. See `specs/010-add-minimal-ci/`
