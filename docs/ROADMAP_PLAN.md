@@ -50,7 +50,7 @@ a separate, later decision.
 
 ## M6 — Reliability Foundation
 
-**Status:** Draft, in progress (`ISS-005`, `ISS-011`, `ISS-012` done)
+**Status:** Draft, in progress (`ISS-005`, `ISS-006`, `ISS-010`, `ISS-011`, `ISS-012` done)
 
 **Why first:** two independent PM-style passes this session converged on the same conclusion —
 the core generate → approve → run loop is still shedding new bugs (`ISS-009`, `ISS-011` both
@@ -64,9 +64,10 @@ modes every session.
    abstraction, a checkout-platform-fragile approval hash affecting 7 of 9 skills, and two
    `create_tool` message/contract mismatches). Unblocks CI (`ISS-012`) being *green-required*,
    not just present. See [[ISSUES]] and `specs/006-fix-pre-existing-test-failures/`.
-2. **`ISS-006`** — declare `pyyaml` as a direct dependency. Small, mechanical.
-3. **`ISS-010`** — bare `/provider` falls through to the LLM. Small, well-scoped — usage-message
-   fix in `py_mono/agent/agent.py`.
+2. **`ISS-006`** — **done.** Declared `pyyaml` as a direct dependency. See [[ISSUES]] and
+   `specs/007-add-pyyaml-direct-dependency/`.
+3. **`ISS-010`** — **done.** Bare `/provider` now shows usage instead of falling through to the
+   LLM. See [[ISSUES]] and `specs/008-fix-bare-provider-command/`.
 4. **`ISS-011`** — **done.** Fence-stripping fixed (`py_mono/skill/validator.py`) and the leaked
    prompt-placeholder line fixed (`py_mono/skill/prompts.py`). The non-code investigation
    confirmed the remote Ollama backend isn't GPU-offloading at all (`size_vram: 0`), explaining
