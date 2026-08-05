@@ -41,7 +41,7 @@ a separate, later decision.
 
 | Milestone | Status | Theme |
 | --- | --- | --- |
-| M6 | Draft, not started | Reliability foundation — CI, open-bug cleanup, model/task fitness check |
+| M6 | Done | Reliability foundation — CI, open-bug cleanup, model/task fitness check |
 | M7 | Draft, not started | Skill lifecycle graph — Critique/Test stages, diff-on-regen, failure-driven evolution |
 | M8 | Draft, gated | Skill provenance & sharing — signed packages, gated on the audience question |
 | Gated/deferred | Awaiting decision | Everything blocked on "personal tool vs. multi-user" |
@@ -50,7 +50,7 @@ a separate, later decision.
 
 ## M6 — Reliability Foundation
 
-**Status:** Draft, not started
+**Status:** Done — all seven scope items shipped.
 
 **Why first:** two independent PM-style passes this session converged on the same conclusion —
 the core generate → approve → run loop is still shedding new bugs (`ISS-009`, `ISS-011` both
@@ -60,18 +60,22 @@ a lifecycle graph) is worth building on top of a foundation that's still finding
 modes every session.
 
 **Scope** (work order — dependencies noted, see [[ISSUES]] for full detail on each):
-1. **`ISS-005`** — root-cause pre-existing test failures. Prerequisite to CI (`ISS-012`) being
-   *green-required*, not just present — can't gate merges on a suite with known, undiagnosed
-   red tests.
-2. **`ISS-006`** — declare `pyyaml` as a direct dependency. Small, mechanical.
-3. **`ISS-010`** — bare `/provider` falls through to the LLM. Small, well-scoped — usage-message
-   fix in `py_mono/agent/agent.py`.
-4. **`ISS-011`** — `generate_skill` fence-stripping + prompt-placeholder-leak fixes. Two code
-   fixes (`py_mono/skill/validator.py`, `py_mono/skill/prompts.py`) plus one non-code
-   investigation (`ollama ps`, possible CPU-bound/unoffloaded inference).
-5. **`ISS-012`** — minimal CI (`pytest` + `python -m compileall` on every PR). Motivated
-   directly by pre-existing untriaged test failures; every regression check before this was a
-   human manually running `pytest`. Depends on `ISS-005` landing first.
+1. **`ISS-005`** — **done.** Root-caused three independent failures (a skill bypassing the tool
+   abstraction, a checkout-platform-fragile approval hash affecting 7 of 9 skills, and two
+   `create_tool` message/contract mismatches). Unblocks CI (`ISS-012`) being *green-required*,
+   not just present. See [[ISSUES]] and `specs/006-fix-pre-existing-test-failures/`.
+2. **`ISS-006`** — **done.** Declared `pyyaml` as a direct dependency. See [[ISSUES]] and
+   `specs/007-add-pyyaml-direct-dependency/`.
+3. **`ISS-010`** — **done.** Bare `/provider` now shows usage instead of falling through to the
+   LLM. See [[ISSUES]] and `specs/008-fix-bare-provider-command/`.
+4. **`ISS-011`** — **done.** Fence-stripping fixed (`py_mono/skill/validator.py`) and the leaked
+   prompt-placeholder line fixed (`py_mono/skill/prompts.py`). The non-code investigation
+   confirmed the remote Ollama backend isn't GPU-offloading at all (`size_vram: 0`), explaining
+   the near-parity throughput. See [[ISSUES]] and `specs/009-generate-skill-quality-issues/`.
+5. **`ISS-012`** — **done.** `.github/workflows/ci.yml` runs `pytest` + `python -m compileall`
+   on every PR and on push to `main`. Validated locally against `ISS-005`'s fix before adding —
+   green. Making it *required* (branch protection) is a separate, repo-owner-only step, not done
+   here. See [[ISSUES]] and `specs/010-add-minimal-ci/`.
 6. **`ISS-013`** — **done.** `py_mono/skill/telemetry.py` logs `skill`/`provider`/`model`/
    `duration_ms`/`success` to `telemetry/skill_runs.jsonl` on every `run_skill_safe` call.
    Originally scoped as an M7 shared dependency, pulled forward into M6 since `ISS-014` needs it
@@ -84,12 +88,9 @@ modes every session.
    session — directly productizes the `ISS-009`/`ISS-011` lesson. See [[ISSUES]] and
    `specs/012-add-model-task-fitness-check/`.
 
-**Note on this branch's view:** every M6 scope item above has a merged-or-open fix from this
-session (`ISS-005` #96, `ISS-006` #97, `ISS-010` #98, `ISS-011` #99, `ISS-012` #100, `ISS-013`
-#101, `ISS-014` — this branch). This branch only has `ISS-013` merged in alongside its own work,
-so its own copy of the Open/Tracked Index above still lists the others as open until each PR
-actually merges — update the Status line and Milestone Index once all seven have landed on
-`main`, rather than trusting this note in isolation.
+**Milestone 6 complete** — all seven scope items above are done, each with its own PR
+(`ISS-005` #96, `ISS-006` #97, `ISS-010` #98, `ISS-011` #99, `ISS-012` #100, `ISS-013` #101,
+`ISS-014` #102) and full SDD trail in `specs/006-` through `specs/012-`.
 
 ---
 
