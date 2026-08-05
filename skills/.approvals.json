@@ -29,6 +29,11 @@
     "seeded": true,
     "sha256": "b7a7e51b0869589b59a94a0a8fe37bf24580ca32ce5ede2bae28ba221fd68e2b"
   },
+  "listallpy": {
+    "recorded_at": "2026-08-05T17:33:41.659013+00:00",
+    "seeded": false,
+    "sha256": "b45e3a516c2971a2596ce724e5d5df69bf31a02e76dcf232bacee783fee85ee6"
+  },
   "refactor_extract_function": {
     "recorded_at": "2026-08-03T22:50:32.457745+00:00",
     "seeded": true,
