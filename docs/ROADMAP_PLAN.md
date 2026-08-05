@@ -70,9 +70,10 @@ modes every session.
 4. **`ISS-011`** — `generate_skill` fence-stripping + prompt-placeholder-leak fixes. Two code
    fixes (`py_mono/skill/validator.py`, `py_mono/skill/prompts.py`) plus one non-code
    investigation (`ollama ps`, possible CPU-bound/unoffloaded inference).
-5. **`ISS-012`** — minimal CI (`pytest` + `python -m compileall` on every PR). Motivated
-   directly by pre-existing untriaged test failures; every regression check before this was a
-   human manually running `pytest`. Depends on `ISS-005` landing first.
+5. **`ISS-012`** — **done.** `.github/workflows/ci.yml` runs `pytest` + `python -m compileall`
+   on every PR and on push to `main`. Validated locally against `ISS-005`'s fix before adding —
+   green. Making it *required* (branch protection) is a separate, repo-owner-only step, not done
+   here. See [[ISSUES]] and `specs/010-add-minimal-ci/`.
 6. **`ISS-013`** — lightweight per-run telemetry (minimal version): flat log (`skill`,
    `provider`, `model`, `duration`, `success`). Originally scoped as an M7 shared dependency,
    pulled forward into M6 since `ISS-014` needs it and M6 ships first; M7 extends this same log

@@ -50,7 +50,6 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
 | ISS-010 | open | M6 | Bare `/provider` silently falls through to the LLM | — |
 | ISS-011 | open | M6 | `generate_skill` output-quality gaps found dogfooding | — |
-| ISS-012 | open | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | — |
 | ISS-013 | open | M6 | Add lightweight per-run telemetry log | — |
 | ISS-014 | open | M6 | Add model/task fitness check | — |
 
@@ -65,6 +64,7 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-005 | done | M6 | Pre-existing test failures unrelated to current branch work | fix-pre-existing-test-failures |
 | ISS-007 | done | M5 | Add dual Ollama backend selection with runtime model switching | ollama-dual-backend |
 | ISS-009 | done | M5 | `OllamaProvider` returns empty content for thinking-capable models | fix-ollama-thinking-response |
+| ISS-012 | done | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | add-minimal-ci |
 
 ---
 
@@ -135,15 +135,6 @@ issue's own section below the index, not in the index table — keeps the table 
      offload logs, not a code fix in this repo.
 - **Fix:** deferred — to be routed through Spec Kit per explicit instruction, not fixed inline
 
-### ISS-012 — Add minimal CI (`pytest` + `compileall` on every PR)
-- **Milestone:** M6
-- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope
-- **What:** there is currently no CI or pre-commit enforcement anywhere in this repo. Every
-  regression check this session was a human manually running `pytest`. Add a CI workflow that
-  runs `pytest` and `python -m compileall` on every PR.
-- **Depends on:** `ISS-005` — can't make CI green-required (block merges on failure) while the
-  suite has known, undiagnosed red tests. `ISS-005` should land first.
-- **Fix:** not started — to be routed through Spec Kit
 
 ### ISS-013 — Add lightweight per-run telemetry log
 - **Milestone:** M6
@@ -276,3 +267,17 @@ issue's own section below the index, not in the index table — keeps the table 
   wrong way before testing against the actual model from the bug report corrected the design —
   see `specs/005-fix-ollama-thinking-response/research.md` for the full empirical trail. Raw
   capture: `kb-template/knowledge/raw/brainstorm-20260805-ollama-thinking-empty-response.md`
+
+### ISS-012 — Add minimal CI (`pytest` + `compileall` on every PR)
+- **Milestone:** M6
+- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope
+- **Fix:** landed on branch `add-minimal-ci`. Added `.github/workflows/ci.yml`: triggers on
+  `pull_request` and `push` to `main`, runs on `ubuntu-latest`, installs `uv`
+  (`astral-sh/setup-uv`), runs `uv sync --group dev`, `uv run pytest -q`, and
+  `uv run python -m compileall -q py_mono skills`
+- **Depended on:** `ISS-005` (fixed, `#96`) — validated locally by merging that fix into this
+  branch before adding CI, so the workflow's commands were confirmed green (104 passed, 1
+  skipped, compileall clean) rather than assumed
+- **Scope note:** adds the workflow only — making it *required* (branch protection blocking
+  merge on failure) is a separate, repo-owner-only GitHub settings change, intentionally not
+  done as part of this item. See `specs/010-add-minimal-ci/`
