@@ -46,7 +46,6 @@ issue's own section below the index, not in the index table — keeps the table 
 
 | ID | Status | Milestone | Title | Branch |
 | --- | --- | --- | --- | --- |
-| ISS-006 | open | M6 | `pyyaml` used transitively but not declared as a direct dependency | — |
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
 | ISS-011 | open | M6 | `generate_skill` output-quality gaps found dogfooding | — |
 | ISS-013 | open | M6 | Add lightweight per-run telemetry log | — |
@@ -61,6 +60,7 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-003 | done | M5 | Skills/dynamic tools execute arbitrary code before approval | fix-skill-tool-approval-gate |
 | ISS-004 | done | M5 | Add `kb-template/` portable knowledge-base scaffold | kb-template |
 | ISS-005 | done | M6 | Pre-existing test failures unrelated to current branch work | fix-pre-existing-test-failures |
+| ISS-006 | done | M6 | `pyyaml` used transitively but not declared as a direct dependency | add-pyyaml-direct-dependency |
 | ISS-007 | done | M5 | Add dual Ollama backend selection with runtime model switching | ollama-dual-backend |
 | ISS-009 | done | M5 | `OllamaProvider` returns empty content for thinking-capable models | fix-ollama-thinking-response |
 | ISS-010 | done | M6 | Bare `/provider` silently falls through to the LLM | fix-bare-provider-command |
@@ -69,18 +69,6 @@ issue's own section below the index, not in the index table — keeps the table 
 ---
 
 ## Open / Tracked — Detail
-
-### ISS-006 — `pyyaml` used transitively but not declared as a direct dependency
-- **Milestone:** M6
-- **Source:** discovered 2026-08-03 during `kb-template` planning; unbundled 2026-08-03 per
-  external PR review
-- **What:** `py_mono/skill/validator.py`, `py_mono/skill/base.py`, and
-  `py_mono/playbook/playbookregistry.py` all `import yaml` directly, but it's only ever
-  resolved transitively (via `litellm`/`fastmcp`), never declared as a direct dependency
-- **History:** a fix was briefly bundled into the `kb-template` branch (commit `c3f8f80`) but
-  reverted, since `kb-template`'s own `pyproject.toml` already declares `pyyaml` independently
-  and doesn't need the root repo touched
-- **Scope:** separate, pre-existing hygiene gap, not a `kb-template` requirement
 
 ### ISS-008 — Full isolated-worker execution for skills/dynamic tools
 - **Milestone:** Gated / deferred — prerequisite for M8, not part of M6
@@ -222,6 +210,20 @@ issue's own section below the index, not in the index table — keeps the table 
   approval). Full suite: 104 passed, 1 skipped (pre-existing, unrelated Windows symlink-privilege
   skip) — was 6 collection errors / 5 failures before. See
   `specs/006-fix-pre-existing-test-failures/`
+
+### ISS-006 — `pyyaml` used transitively but not declared as a direct dependency
+- **Milestone:** M6
+- **Source:** discovered 2026-08-03 during `kb-template` planning; unbundled 2026-08-03 per
+  external PR review
+- **Fix:** landed on branch `add-pyyaml-direct-dependency`. Added `pyyaml` (unpinned) to the
+  root `pyproject.toml`'s direct dependencies and regenerated `uv.lock`. Confirmed 4 direct
+  `import yaml` call sites first (`py_mono/skill/validator.py`, `py_mono/skill/base.py`,
+  `py_mono/playbook/playbookregistry.py`, `skills/generate_playbook/skill.py`)
+- **History:** a fix was briefly bundled into the `kb-template` branch (commit `c3f8f80`) but
+  reverted, since `kb-template`'s own `pyproject.toml` already declares `pyyaml` independently
+  and doesn't need the root repo touched
+- **Scope:** separate, pre-existing hygiene gap, not a `kb-template` requirement. See
+  `specs/007-add-pyyaml-direct-dependency/`
 
 ### ISS-007 — Add dual Ollama backend selection with runtime model switching
 - **Milestone:** M5

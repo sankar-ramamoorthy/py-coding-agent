@@ -13,7 +13,8 @@ dependencies = [
     "fastmcp==3.1.1",
     "mcp>=1.25.0",
     "cryptography",
-    "debugpy"
+    "debugpy",
+    "pyyaml"
 ]
 
 [build-system]
