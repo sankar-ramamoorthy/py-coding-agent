@@ -1,7 +1,3 @@
-
-# README_Skills.md
-
-```markdown
 # Skills Layer Design
 ## Relation to project layout
 
