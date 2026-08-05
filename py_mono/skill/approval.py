@@ -6,6 +6,7 @@ from typing import Optional, Dict
 
 from py_mono.skill.base import SkillRegistry, SkillContext, Skill
 from py_mono.skill.telemetry import log_skill_run
+from py_mono.skill.fitness import check_model_fitness
 
 
 class ApprovalError(Exception):
@@ -151,11 +152,15 @@ def run_skill_safe(
         except Exception:
             pass
 
+    fitness_warning = check_model_fitness(skill_name, provider_name, model_name)
+
     start = time.monotonic()
     success = False
     try:
         result = skill.run(request, safe_context)
         success = True
+        if fitness_warning:
+            return f"{fitness_warning}\n\n{result}"
         return result
     except Exception as e:
         raise RuntimeError(

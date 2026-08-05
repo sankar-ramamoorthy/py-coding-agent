@@ -47,7 +47,6 @@ issue's own section below the index, not in the index table — keeps the table 
 | ID | Status | Milestone | Title | Branch |
 | --- | --- | --- | --- | --- |
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
-| ISS-014 | open | M6 | Add model/task fitness check | — |
 
 ## Closed Index
 
@@ -65,6 +64,7 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-011 | done | M6 | `generate_skill` output-quality gaps found dogfooding | fix-generate-skill-quality-issues |
 | ISS-012 | done | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | add-minimal-ci |
 | ISS-013 | done | M6 | Add lightweight per-run telemetry log | add-skill-run-telemetry |
+| ISS-014 | done | M6 | Add model/task fitness check | add-model-task-fitness-check |
 
 ---
 
@@ -81,16 +81,6 @@ issue's own section below the index, not in the index table — keeps the table 
   gap via a hash-ledger gate, not content-level sandboxing
 - **Status:** tracked for future consideration, not started — also a prerequisite for
   Milestone 8 (`docs/ROADMAP_PLAN.md`), not just "eventually"
-
-### ISS-014 — Add model/task fitness check
-- **Milestone:** M6
-- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope
-- **What:** warn before a heavy generation call if the configured model looks like a poor fit
-  for structured output. Directly productizes the `ISS-009`/`ISS-011` lesson (thinking models
-  reasoning verbosely/unreliably on template-filling tasks).
-- **Depends on:** `ISS-013` — needs the per-run telemetry log to have data to check fitness
-  against. Sequence last within M6.
-- **Fix:** not started — to be routed through Spec Kit
 
 ---
 
@@ -289,3 +279,17 @@ issue's own section below the index, not in the index table — keeps the table 
   `dynamic_tools/` pattern; operational data, not source). Added `tests/test_skill_telemetry.py`
   (5 tests) and 3 new tests in `tests/test_skill_approval.py`. See
   `specs/011-add-skill-run-telemetry/`
+
+### ISS-014 — Add model/task fitness check
+- **Milestone:** M6
+- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope
+- **Fix:** landed on branch `add-model-task-fitness-check`. New `py_mono/skill/fitness.py`:
+  `check_model_fitness(skill, provider, model)` reads `ISS-013`'s telemetry log, and — only once
+  at least 3 recorded runs exist for the exact (skill, provider, model) combination — warns if
+  at least half of the most recent 5 matching runs failed. Hooked into `run_skill_safe`
+  (`py_mono/skill/approval.py`): a warning (if any) is prepended to a successful result; a
+  failed run attaches no warning (its own exception is already the signal). Directly
+  productizes the `ISS-009`/`ISS-011` lesson (thinking models reasoning verbosely/unreliably on
+  template-filling tasks) as an evidence-based check, not a hardcoded list of "bad" models.
+  Added `tests/test_skill_fitness.py` (6 tests) and 3 new tests in
+  `tests/test_skill_approval.py`. See `specs/012-add-model-task-fitness-check/`

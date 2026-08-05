@@ -41,7 +41,7 @@ a separate, later decision.
 
 | Milestone | Status | Theme |
 | --- | --- | --- |
-| M6 | In progress | Reliability foundation — CI, open-bug cleanup, model/task fitness check |
+| M6 | Done | Reliability foundation — CI, open-bug cleanup, model/task fitness check |
 | M7 | Draft, not started | Skill lifecycle graph — Critique/Test stages, diff-on-regen, failure-driven evolution |
 | M8 | Draft, gated | Skill provenance & sharing — signed packages, gated on the audience question |
 | Gated/deferred | Awaiting decision | Everything blocked on "personal tool vs. multi-user" |
@@ -50,8 +50,7 @@ a separate, later decision.
 
 ## M6 — Reliability Foundation
 
-**Status:** Draft, in progress (`ISS-005`, `ISS-006`, `ISS-010`, `ISS-011`, `ISS-012`, `ISS-013`
-done — only `ISS-014` left)
+**Status:** Done — all seven scope items shipped.
 
 **Why first:** two independent PM-style passes this session converged on the same conclusion —
 the core generate → approve → run loop is still shedding new bugs (`ISS-009`, `ISS-011` both
@@ -82,11 +81,16 @@ modes every session.
    Originally scoped as an M7 shared dependency, pulled forward into M6 since `ISS-014` needs it
    and M6 ships first; M7 extends this same log rather than building a second one. See
    [[ISSUES]] and `specs/011-add-skill-run-telemetry/`.
-7. **`ISS-014`** — model/task fitness check: warn before a heavy generation call if the
-   configured model looks like a poor fit for structured output. The clearest "bug we hit →
-   feature that prevents the next one" line of anything discussed this session — directly
-   productizes the `ISS-009`/`ISS-011` lesson (thinking models reasoning verbosely/unreliably on
-   template-filling tasks). Depends on `ISS-013` — sequence last within M6.
+7. **`ISS-014`** — **done.** `py_mono/skill/fitness.py`'s `check_model_fitness` warns when a
+   (skill, provider, model) combination has recently failed at least half its runs (min. 3
+   samples, most recent 5 considered), prepended to the result via `run_skill_safe`. The
+   clearest "bug we hit → feature that prevents the next one" line of anything discussed this
+   session — directly productizes the `ISS-009`/`ISS-011` lesson. See [[ISSUES]] and
+   `specs/012-add-model-task-fitness-check/`.
+
+**Milestone 6 complete** — all seven scope items above are done, each with its own PR
+(`ISS-005` #96, `ISS-006` #97, `ISS-010` #98, `ISS-011` #99, `ISS-012` #100, `ISS-013` #101,
+`ISS-014` #102) and full SDD trail in `specs/006-` through `specs/012-`.
 
 ---
 
