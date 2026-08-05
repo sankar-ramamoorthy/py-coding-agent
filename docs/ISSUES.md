@@ -46,10 +46,7 @@ issue's own section below the index, not in the index table — keeps the table 
 
 | ID | Status | Milestone | Title | Branch |
 | --- | --- | --- | --- | --- |
-| ISS-006 | open | M6 | `pyyaml` used transitively but not declared as a direct dependency | — |
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
-| ISS-010 | open | M6 | Bare `/provider` silently falls through to the LLM | — |
-| ISS-011 | open | M6 | `generate_skill` output-quality gaps found dogfooding | — |
 
 ## Closed Index
 
@@ -60,8 +57,11 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-003 | done | M5 | Skills/dynamic tools execute arbitrary code before approval | fix-skill-tool-approval-gate |
 | ISS-004 | done | M5 | Add `kb-template/` portable knowledge-base scaffold | kb-template |
 | ISS-005 | done | M6 | Pre-existing test failures unrelated to current branch work | fix-pre-existing-test-failures |
+| ISS-006 | done | M6 | `pyyaml` used transitively but not declared as a direct dependency | add-pyyaml-direct-dependency |
 | ISS-007 | done | M5 | Add dual Ollama backend selection with runtime model switching | ollama-dual-backend |
 | ISS-009 | done | M5 | `OllamaProvider` returns empty content for thinking-capable models | fix-ollama-thinking-response |
+| ISS-010 | done | M6 | Bare `/provider` silently falls through to the LLM | fix-bare-provider-command |
+| ISS-011 | done | M6 | `generate_skill` output-quality gaps found dogfooding | fix-generate-skill-quality-issues |
 | ISS-012 | done | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | add-minimal-ci |
 | ISS-013 | done | M6 | Add lightweight per-run telemetry log | add-skill-run-telemetry |
 | ISS-014 | done | M6 | Add model/task fitness check | add-model-task-fitness-check |
@@ -69,18 +69,6 @@ issue's own section below the index, not in the index table — keeps the table 
 ---
 
 ## Open / Tracked — Detail
-
-### ISS-006 — `pyyaml` used transitively but not declared as a direct dependency
-- **Milestone:** M6
-- **Source:** discovered 2026-08-03 during `kb-template` planning; unbundled 2026-08-03 per
-  external PR review
-- **What:** `py_mono/skill/validator.py`, `py_mono/skill/base.py`, and
-  `py_mono/playbook/playbookregistry.py` all `import yaml` directly, but it's only ever
-  resolved transitively (via `litellm`/`fastmcp`), never declared as a direct dependency
-- **History:** a fix was briefly bundled into the `kb-template` branch (commit `c3f8f80`) but
-  reverted, since `kb-template`'s own `pyproject.toml` already declares `pyyaml` independently
-  and doesn't need the root repo touched
-- **Scope:** separate, pre-existing hygiene gap, not a `kb-template` requirement
 
 ### ISS-008 — Full isolated-worker execution for skills/dynamic tools
 - **Milestone:** Gated / deferred — prerequisite for M8, not part of M6
@@ -93,49 +81,6 @@ issue's own section below the index, not in the index table — keeps the table 
   gap via a hash-ledger gate, not content-level sandboxing
 - **Status:** tracked for future consideration, not started — also a prerequisite for
   Milestone 8 (`docs/ROADMAP_PLAN.md`), not just "eventually"
-
-### ISS-010 — Bare `/provider` silently falls through to the LLM
-- **Milestone:** M6
-- **Source:** 2026-08-05 session, user hit it live in the CLI
-- **What:** `py_mono/agent/agent.py`'s `_is_special_command`/`_handle_special_command` only
-  match `text.startswith("/provider ")` (trailing space + argument required) or the exact
-  string `/providers`. Bare `/provider` (no space, no argument) matches neither, so it's routed
-  to the LLM as a normal chat message instead of showing usage
-- **Reproduced live:** bare `/provider` produced an LLM reply ("What specific type of
-  \"provider\" were you asking about?"); `/provider ollama-auto qwen2.5-coder:7b-instruct-q5_K_M`
-  (the correct form) switched providers normally
-- **Fix:** deferred — to be routed through Spec Kit (specify → plan → tasks → implement) per
-  explicit instruction, not fixed inline
-
-### ISS-011 — `generate_skill` output-quality gaps found dogfooding
-- **Milestone:** M6
-- **Source:** 2026-08-05 session, user hit it live running
-  `/skill generate_skill listallpy | ...` after switching to a coding-tuned model; reviewed with
-  claude.ai, both findings re-verified against the actual code before filing
-- **Context:** three related findings from one *successful* (not failing) run — the underlying
-  ISS-009 fix worked; these are quality/robustness gaps in `generate_skill` itself
-- **What:**
-  1. **Fence-stripping isn't symmetric-only safe** — `_strip_markdown_fences()`
-     (`py_mono/skill/validator.py:233`) only strips a leading fence if the whole output starts
-     with one, and only strips a trailing fence if a leading one was already found. A
-     trailing-only fence leaves a stray `` ``` `` in the output; any preamble before the fence
-     (e.g. "Here's the code:\n```python...") isn't stripped at all and would fail `ast.parse()`
-     outright. Didn't manifest this run only because the model happened to fence symmetrically
-     with no preamble.
-  2. **Leaked template placeholder line** — `py_mono/skill/prompts.py:90` contains `- List each
-     constraint as a bullet point.`, phrased identically to a real constraint bullet, with
-     nothing marking it as instructional text to replace rather than content to keep. The model
-     echoed it back verbatim as a "constraint" in the generated `SKILL.md` (confirmed in the
-     transcript).
-  3. **Possible CPU-bound/unoffloaded inference** — both `generate_skill` LLM calls this run
-     showed prompt-processing throughput (~15 tok/s) in the same order of magnitude as
-     generation throughput (~6 tok/s); on GPU, prompt processing is normally an order of
-     magnitude faster than autoregressive generation, so near-parity suggests CPU-bound or
-     partial-GPU-offload inference — needs investigating via `ollama ps` or server-side GPU
-     offload logs, not a code fix in this repo.
-- **Fix:** deferred — to be routed through Spec Kit per explicit instruction, not fixed inline
-
-
 
 ---
 
@@ -217,6 +162,20 @@ issue's own section below the index, not in the index table — keeps the table 
   skip) — was 6 collection errors / 5 failures before. See
   `specs/006-fix-pre-existing-test-failures/`
 
+### ISS-006 — `pyyaml` used transitively but not declared as a direct dependency
+- **Milestone:** M6
+- **Source:** discovered 2026-08-03 during `kb-template` planning; unbundled 2026-08-03 per
+  external PR review
+- **Fix:** landed on branch `add-pyyaml-direct-dependency`. Added `pyyaml` (unpinned) to the
+  root `pyproject.toml`'s direct dependencies and regenerated `uv.lock`. Confirmed 4 direct
+  `import yaml` call sites first (`py_mono/skill/validator.py`, `py_mono/skill/base.py`,
+  `py_mono/playbook/playbookregistry.py`, `skills/generate_playbook/skill.py`)
+- **History:** a fix was briefly bundled into the `kb-template` branch (commit `c3f8f80`) but
+  reverted, since `kb-template`'s own `pyproject.toml` already declares `pyyaml` independently
+  and doesn't need the root repo touched
+- **Scope:** separate, pre-existing hygiene gap, not a `kb-template` requirement. See
+  `specs/007-add-pyyaml-direct-dependency/`
+
 ### ISS-007 — Add dual Ollama backend selection with runtime model switching
 - **Milestone:** M5
 - **Source:** 2026-08-03 session, user request
@@ -248,6 +207,49 @@ issue's own section below the index, not in the index table — keeps the table 
   wrong way before testing against the actual model from the bug report corrected the design —
   see `specs/005-fix-ollama-thinking-response/research.md` for the full empirical trail. Raw
   capture: `kb-template/knowledge/raw/brainstorm-20260805-ollama-thinking-empty-response.md`
+
+### ISS-010 — Bare `/provider` silently falls through to the LLM
+- **Milestone:** M6
+- **Source:** 2026-08-05 session, user hit it live in the CLI
+- **Fix:** landed on branch `fix-bare-provider-command`. `py_mono/agent/agent.py`'s
+  `_is_special_command`/`_handle_special_command` only matched `text.startswith("/provider ")`
+  (trailing space + argument required) or the exact string `/providers`. Added the exact string
+  `"/provider"` to the recognized-commands tuple and a matching branch returning
+  `"Usage: /provider <provider> [model]"` (the same message already used for the
+  trailing-space case)
+- **Reproduced live before the fix:** bare `/provider` produced an LLM reply ("What specific
+  type of \"provider\" were you asking about?"); `/provider ollama-auto
+  qwen2.5-coder:7b-instruct-q5_K_M` (the correct form) switched providers normally
+- **Tests:** added `tests/test_special_commands.py` (5 tests: bare `/provider` recognized +
+  shows usage, trailing-space-only unaffected, `/providers` unaffected, valid-argument switching
+  unaffected). See `specs/008-fix-bare-provider-command/`
+
+### ISS-011 — `generate_skill` output-quality gaps found dogfooding
+- **Milestone:** M6
+- **Source:** 2026-08-05 session, user hit it live running
+  `/skill generate_skill listallpy | ...` after switching to a coding-tuned model; reviewed with
+  claude.ai, both findings re-verified against the actual code before filing
+- **Context:** three related findings from one *successful* (not failing) run — the underlying
+  ISS-009 fix worked; these are quality/robustness gaps in `generate_skill` itself
+- **Fix:** landed on branch `fix-generate-skill-quality-issues`. Two code fixes plus one
+  non-code investigation:
+  1. **Fence-stripping** — `_strip_markdown_fences()` (`py_mono/skill/validator.py`) rewritten
+     to find a fenced code block via regex anywhere in the text, instead of requiring the
+     string to start with a fence. Fixes trailing-only fences and preamble-before-fence output.
+     Added `tests/test_skill_validator.py` (7 tests).
+  2. **Leaked template placeholder** — `py_mono/skill/prompts.py`'s
+     `build_skill_md_prompt()` fillable sections (paragraph description, expected output,
+     constraints) now marked with explicit `[INSTRUCTION — ...]` prefixes, plus a closing rule
+     telling the model never to copy an instruction marker into its output. Added
+     `tests/test_skill_prompts.py` (3 tests).
+  3. **CPU-bound/unoffloaded inference** — investigated directly against the reachable
+     `OLLAMA_REMOTE_URL` (`http://100.105.24.12:11434`): `/api/ps` after loading
+     `qwen2.5-coder:7b-instruct-q5_K_M` (the model from the original report) showed
+     `size_vram: 0` against a ~5.8 GB model — confirmed with a second model, also `size_vram: 0`.
+     The remote backend is not GPU-offloading inference at all, for any model tested, which
+     explains the originally-reported near-parity throughput. Not a code fix in this repo — see
+     `specs/009-generate-skill-quality-issues/research.md`. *Why* GPU offload isn't happening
+     would need direct access to that host's own system, out of this session's reach.
 
 ### ISS-012 — Add minimal CI (`pytest` + `compileall` on every PR)
 - **Milestone:** M6
