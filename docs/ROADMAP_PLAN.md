@@ -63,7 +63,8 @@ modes every session.
 1. **`ISS-005`** — root-cause pre-existing test failures. Prerequisite to CI (`ISS-012`) being
    *green-required*, not just present — can't gate merges on a suite with known, undiagnosed
    red tests.
-2. **`ISS-006`** — declare `pyyaml` as a direct dependency. Small, mechanical.
+2. **`ISS-006`** — **done.** Declared `pyyaml` as a direct dependency. See [[ISSUES]] and
+   `specs/007-add-pyyaml-direct-dependency/`.
 3. **`ISS-010`** — bare `/provider` falls through to the LLM. Small, well-scoped — usage-message
    fix in `py_mono/agent/agent.py`.
 4. **`ISS-011`** — `generate_skill` fence-stripping + prompt-placeholder-leak fixes. Two code

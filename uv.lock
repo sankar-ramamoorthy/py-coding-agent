@@ -2041,6 +2041,7 @@ dependencies = [
     { name = "mcp" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pyyaml" },
     { name = "requests" },
     { name = "rich" },
 ]
@@ -2058,6 +2059,7 @@ requires-dist = [
     { name = "litellm", specifier = "==1.82.6" },
     { name = "mcp", specifier = ">=1.25.0" },
     { name = "pandas" },
+    { name = "pyyaml" },
     { name = "requests" },
     { name = "rich" },
 ]

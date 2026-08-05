@@ -1,3 +1,3 @@
 {
-  "feature_directory": "specs/005-fix-ollama-thinking-response"
+  "feature_directory": "specs/007-add-pyyaml-direct-dependency"
 }
