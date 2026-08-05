@@ -1,3 +1,10 @@
+> **Archived snapshot — 2026-04-12.** Superseded by `docs/architectural-summary.md`, the
+> current, actively-maintained version. Kept as-is (not edited) as a historical record of the
+> architecture at that point; see the "History" section of the new doc for what's changed
+> since. Do not treat anything below as current state without checking the new doc first.
+
+---
+
 • Architectural Summary
 
   This system is a Dockerized Python coding agent built around a small core loop, a sandboxed execution model, and a growing separation between reasoning and execution.

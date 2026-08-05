@@ -1,189 +1,127 @@
 # py-coding-agent — Design Summary
-# docs\design-summary.md
-`py-coding-agent` is a Dockerized Python‑based coding agent that uses an LLM to reason, call tools, and execute tasks inside a **sandboxed workspace** (`/workspace`).
 
-## Current State (Milestone 2 → 3)
+`py-coding-agent` is a Dockerized Python-based coding agent that uses an LLM to reason, call
+tools, and execute tasks inside a **sandboxed workspace** (`/workspace`).
 
-- **Core agent loop** follows a **pi‑mono style minimal loop**, using canonical OpenAI‑style messages.  
-- **Provider‑agnostic LLM design** via `LLMProvider`, `OllamaProvider`, and `LiteLLMProvider` (ADR‑005).  
-- **Docker‑based runtime** with:
-  - Workspace sandbox (`/workspace`).  
-  - Volume‑mounted `dynamic_tools/`.  
-  - MCP server (`datetime‑mcp`) on a shared Docker network.  
-- **Dependency management** with `uv` and reproducible `uv.lock` (ADR‑007).  
-- **Provider registry and session management** (ADR‑006):
-  - `py_mono/llm/provider_registry.py` maps provider names to classes.  
-  - `py_mono/session/session_manager.py` holds per‑session provider state and temporary overrides.  
-  - `Agent` depends on `SessionManager`, not a fixed `llm` instance.  
-- **Runtime provider switching**:
-  - CLI commands like `/provider ollama`, `/provider litellm`, and `/providers` are implemented.  
-  - `/provider <name> <model>` supports **tight‑binding model selection** (ADR‑009), overriding or complementing env variables.  
+_Rewritten 2026-08-05 as a single current-state document — see "Document history" at the
+bottom for why the previous version needed this instead of another patch._
 
-## Smart Provider Routing (ADR‑008)
+## Current state (Milestone 5 shipped)
 
-An **ADR‑008‑style smart provider router** is being designed to auto‑select the best LLM for each task type. The idea is to route:
+- **Core agent loop** follows a **pi-mono style minimal loop**, using canonical OpenAI-style
+  messages, now driven by a **structured orchestration envelope** (ADR-017): the LLM responds
+  with either plain text or `{"_type": "agent_action", "action": "answer"|"use_skill", ...}`,
+  and the runtime dispatches accordingly rather than only reacting to a typed `/skill` command.
+- **Provider-agnostic LLM design** via `LLMProvider`, `OllamaProvider`, and `LiteLLMProvider`
+  (ADR-005), with runtime provider switching and tight-bound model selection:
+  `/provider <name> [model]` (ADR-009), overriding env defaults for that session, no restart.
+- **Docker-based runtime** with a workspace sandbox (`/workspace`), volume-mounted
+  `dynamic_tools/`, and an MCP server (`datetime-mcp`) on a shared Docker network.
+- **Dependency management** with `uv` and a hybrid lock strategy (ADR-007): local `uv lock` for
+  day-to-day work, container-resolved locks before releases or major merges.
+- **Provider registry and session management** (ADR-006): `provider_registry.py` maps provider
+  names to classes; `SessionManager` holds per-session provider state; `Agent` depends on
+  `SessionManager`, not a fixed `llm` instance.
+- **Strict tool interface (ADR-014):** `Tool.run(**kwargs)` is the only sanctioned call path;
+  direct `.func(...)` access is forbidden, because LLMs kept mis-calling the old form.
+- **Skills layer, fully built out** (ADR-010, ADR-012, ADR-013, ADR-014, ADR-015, ADR-016):
+  see below.
+- **Spec Kit adopted for this repo's own development (ADR-019):** `/speckit-specify` →
+  `/speckit-plan` → `/speckit-tasks` → `/speckit-implement`, artifacts in
+  `specs/<NNN>-<slug>/`. Distinct from the skills layer's own approval gate and from ADR-018's
+  end-user-facing requirements workflow (see below) — three different things that all involve
+  the word "spec."
 
-- **Local / private tasks** (e.g. file inspection, shell execution) to a local `ollama` model,  
-- **Fast, low‑cost tool calls** (e.g. simple code generation or tool‑use decisions) to cost‑efficient cloud providers like `groq`, and  
-- **Complex planning or reasoning‑heavy tasks** (e.g. multi‑step refactoring, architecture design) to higher‑quality models like `anthropic` or `gpt‑4o`.  
+## Providers & LLM integration
 
-The router is envisioned to operate **inside the `SessionManager`**: it takes a canonical request, inspects metadata (tool stack, task complexity, privacy flags), and returns the best `LLMProvider` instance for that step, while keeping the agent’s own logic clean.
+- Multi-provider support via LiteLLM (Groq, OpenAI, Anthropic) plus local Ollama (default).
+- Runtime provider switching and model binding (`/provider <name> [model]`).
+- Session management with memory pruning and tool-aware context.
+- Encrypted API key storage (`LLM_MASTER_KEY`).
+- Ollama-specific hardening (`ISS-009`): `think: false` by default plus `num_predict`/`num_ctx`
+  as a safety net, so a thinking-capable local model can't silently exhaust its response budget
+  on internal reasoning and return empty content.
 
-## Where It’s Going (Milestone 3)
+## Tools
 
-- **Runtime provider switching**:
-  - CLI commands like `/provider groq`, `/provider ollama`, and `/providers` to inspect and change providers at runtime.  
-- **Encrypted API key management**:
-  - `py_mono/security/key_manager.py` (future) for encrypted on‑disk keys, with `LLM_MASTER_KEY` as an environment‑only secret.  
-- **Smart provider routing by task type** (ADR‑008):
-  - Heuristic‑based router that picks `ollama` for local/private, `groq` for fast tools, `anthropic` for complex reasoning, etc.  
-- **Tight‑binding model selection (ADR‑009)**:
-  - Implemented: `/provider <provider> <model>` binds the model to the provider instance, making it truthfully the active model for that session.  
-  - Env variables remain the default fallback when no model is explicitly given.
+- Built-in: `list_files`, `read_file`, `write_file`, `edit_file`, `shell`,
+  `install_dependency`, `create_tool`.
+- Dynamic tools created at runtime via `create_tool.py`; must be registered to be discoverable.
+- Tools are called internally from skills for modular workflows, always via `Tool.run(...)`.
 
+## Skills layer
 
-**Agent skills layer (Milestone 5)**:
-  - Implement reusable workflows via `/skill <name>`:
-    - `bug_fix` — fix bugs from error messages.
-    - `refactor_extract_function` — extract blocks into helper functions.
-    - `doc_sync` — keep doc comments and READMEs in sync with code.
-  - Gate execution with `status: proposed` / `status: approved` (ADR‑010).
-  - Allow operator‑approved dry‑run modes for risky skills.
+Structured, reusable workflows, invocable either via `/skill <name> ...` or by the LLM's own
+`action: "use_skill"` choice (ADR-017).
 
----
+### Design
 
-#  `design-summary.md` Update (Milestone 5)
+- `skills/<skill_name>/SKILL.md` — Markdown spec + YAML front-matter (required).
+- `skills/<skill_name>/skill.py` — Python implementation (optional).
+- `SkillRegistry` discovers skills at startup and tracks `status: proposed` / `status:
+  approved`, verified against a hash ledger (`skills/.approvals.json`) so approval can't be
+  silently bypassed (`ISS-003`, fixed).
+- `SkillContext` provides `workspace_root`, `session_manager`, and `agent_tools` to every skill
+  at runtime.
+- Skills can call existing tools, write and run tests, and read/write code in the sandbox — but
+  never touch the filesystem or shell directly (ADR-016).
 
-````markdown 
-# Py-Coding-Agent: Design Summary (Milestone 5)
+### Current skills (9)
 
-This update summarizes the current state of the agent and provides a snapshot of implemented features, particularly focusing on the **Skills Layer (Milestone 5)**.
+- `bug_fix` — fix bugs from stack traces or error messages.
+- `refactor_extract_function` — extract code blocks into helper functions.
+- `doc_sync` — keep doc comments and READMEs in sync with code.
+- `hello` — example skill demonstrating the interactive generator workflow.
+- `generate_skill` — interactive in-repo skill scaffolder (`/skill generate_skill`); new skills
+  default to `status: proposed`.
+- `create_skill_py` — scaffolds `skill.py` for a skill that only has a `SKILL.md` so far.
+- `generate_playbook` — mirrors `generate_skill`'s pattern for the reasoning layer.
+- `scaffold_project` — requirements-driven project scaffolding for end users (ADR-018): reads
+  `workspace/requirements.md`, generates a file manifest, writes files via `write_file`, runs
+  `pytest` if tests were generated.
+- `listallpy` — lists Python files in the workspace.
 
----
-
-## 1. Core Agent Loop
-
-- Multi-step reasoning + execution inspired by pi-mono minimal loop  
-- CLI-driven interaction  
-- Workspace sandboxing (`/workspace`)  
-- File and shell tools (`list_files`, `read_file`, `write_file`, `edit_file`, `shell`)  
-- MCP integration for specialized tools (e.g., `datetime-mcp`)  
-
----
-
-## 2. Providers & LLM Integration
-
-- Multi-provider support via **LiteLLM** (Groq, OpenAI, Anthropic)  
-- Local Ollama support (default)  
-- Runtime provider switching and model binding (`/provider <name> [model]`)  
-- Session management with memory pruning and tool-aware context  
-- Encrypted API key storage (`LLM_MASTER_KEY`)  
-
----
-
-## 3. Tools
-
-- Built-in tools: `list_files`, `read_file`, `write_file`, `edit_file`, `shell`, `install_dependency`, `create_tool`  
-- Dynamic tools created at runtime via `create_tool.py`  
-- Tools must be registered to be discoverable  
-- Tools can be called **internally from skills** for modular workflows  
-
----
-
-## 4. Skills Layer (Milestone 5)
-
-The **skills layer** provides structured, reusable workflows callable via `/skill <name>`:
-
-### Key Features
-
-- Skills live in `skills/<skill_name>/`  
-  - `SKILL.md` — Markdown spec + YAML front-matter  
-  - `skill.py` — Python implementation with optional helpers  
-- Registered dynamically via `SkillRegistry` at startup  
-- Execution gated with `status: proposed / approved` (ADR-010)  
-- Skills can call dynamic tools internally, enabling multi-step, deterministic workflows  
-- Compatible with lightweight or open-source LLMs, since execution is local  
-
-### Interactive Skill Generator
-
-- Dev-only workflow: `/skill generate-skill` scaffolds a new skill inside the repo  
-- Generates `SKILL.md` + `skill.py` with pre-filled helpers and optional tool references  
-- New skills are automatically `status: proposed` until reviewed  
-
-### CLI Commands
+### CLI commands
 
 ```text
 /skill list                    → list all skills
 /skill help <skill_name>       → show skill spec (SKILL.md)
 /skill <skill_name> ...        → run an approved skill
-/skill generate-skill ...      → scaffold a new skill (dev-only)
-````
-
-### Reference Skills
-
-* `bug_fix` — Fix bugs from stack traces or error messages
-* `refactor_extract_function` — Extract code blocks into helper functions
-* `doc_sync` — Keep doc comments and READMEs in sync with code
-* `hello` — Example skill demonstrating the interactive generator workflow
-
----
-
-## 5. Skills vs Tools
-
-| Aspect         | Skill                        | Tool                                     |
-| -------------- | ---------------------------- | ---------------------------------------- |
-| Discovery      | Dynamic via SkillRegistry    | Manual registration via `create_tool.py` |
-| Execution      | Local Python + helpers       | Single Python function, local execution  |
-| LLM Dependency | Optional, reasoning assisted | Optional, only input guidance            |
-| Complexity     | Multi-step workflows         | Usually single-purpose utility           |
-| Scaffold       | `/skill generate-skill`      | Manual creation or `create_tool.py`      |
-
-Skills are **higher-level workflows**, potentially calling tools for modular execution. Tools remain **lower-level utilities** registered separately.
-
----
-
-## 6. Milestones
-
-**Milestone 1–4**: Core agent loop, providers, tools, session management, MCP integration ✅
-
-**Milestone 5 (Skills Layer) ✅**
-
-* Reusable workflows via `/skill <name>`
-* Reference skills: `bug_fix`, `refactor_extract_function`, `doc_sync`, `hello`
-* Execution gating: `status: proposed / approved`
-* Developer-approved dry-run modes
-* Interactive in-repo skill generator (`/skill generate-skill`)
-* Skills can call dynamic tools internally
-* Compatible with lightweight/open-source LLMs
-
----
-
-## 7. Roadmap / Future Enhancements
-
-* Multi-agent system (planner / coder / tester)
-* Tool registry with validation and testing
-* Memory indexing for tools
-* Automated tool testing
-* Smarter task decomposition and provider routing
-* Additional MCP servers (weather, search, geocoding)
-* Packaging and distribution improvements
-
----
-
-## 8. Summary
-
-The agent now supports **a fully-featured skills layer**, enabling deterministic, multi-step coding workflows. Combined with tools, providers, session management, and sandboxed execution, this design ensures safe, modular, and reproducible agent behavior across LLM providers.
-
+/skill generate_skill ...      → scaffold a new skill (dev-only)
 ```
 
----
+## Skills vs tools
 
- This design summary now fully reflects **Milestone 5**:  
+| Aspect         | Skill                        | Tool                                     |
+| -------------- | ----------------------------- | ----------------------------------------- |
+| Discovery      | Dynamic via `SkillRegistry`   | Manual registration via `create_tool.py` |
+| Execution      | Local Python + helpers        | Single Python function, local execution  |
+| Invocation     | `/skill ...` or LLM `use_skill` action | Called from within skills or the agent loop |
+| Complexity     | Multi-step workflows          | Usually single-purpose utility           |
+| Scaffold       | `/skill generate_skill`       | Manual creation or `create_tool.py`      |
 
-- Skills layer  
-- Interactive generator  
-- Tools called from skills  
-- CLI commands updated  
-- Lightweight LLM support explicitly mentioned  
+Skills are higher-level, approval-gated workflows; tools are lower-level utilities they call
+into.
 
----
+## Roadmap
+
+Not duplicated here — see `docs/ROADMAP_PLAN.md` for current milestone sequencing (Milestone 6
+reliability foundation, Milestone 7 skill lifecycle graph, Milestone 8 provenance/sharing, and
+what's explicitly gated pending the personal-tool-vs-multi-user decision). Keeping the future
+list in one place instead of copied here is deliberate — this file drifted out of sync with
+reality before precisely because it carried its own separate future-work list.
+
+## Summary
+
+The agent supports a fully-featured skills layer — deterministic, multi-step, approval-gated
+workflows — combined with tools, providers, session management, and sandboxed execution. The
+approval gate (`proposed → approved → runnable`) is this project's most differentiated asset: a
+governance story (capabilities a human signs off on), not just a capability story (an agent
+that writes and runs code).
+
+## Document history
+
+This file previously carried a "Milestone 2 → 3" pass followed by a full second document
+nested inside a Markdown code fence labeled "Milestone 5 update," left mid-edit with an
+unclosed fence. That structure is gone as of this rewrite; if you need the pre-2026-08-05
+content, it's in git history for this file, not preserved inline.
