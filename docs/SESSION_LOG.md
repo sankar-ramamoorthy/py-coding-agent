@@ -28,6 +28,106 @@ artifacts), `c3f8f80` (kb-template implementation) on branch `kb-template`. Also
 commit's session-doc updates (`docs/ISSUES.md`, `docs/SESSION_LOG.md`,
 `docs/CURRENT_FOCUS.md`, `docs/NEXT_ACTIONS.md`).
 
+---
+
+## 2026-08-05 — README/KB doc-drift cleanup, capture-brainstorm-note skill, fix ISS-009 (Ollama thinking-model empty response)
+
+**Issue**: Started from a user-run claude.ai doc-freshness audit of `README.md`; expanded into
+several related pieces of work in one session: doc-drift fixes, a new project skill, filing and
+fixing a real bug (ISS-009) hit live during the session.
+
+**Scope completed**:
+- **README/kb-template doc-drift** (PR #83): consolidated three duplicated/drifted "skills"
+  sections in `README.md` into one pointer at `README_Skills.md`/`docs/skills.md`; removed a
+  broken orphan code fence; fixed a stale `docs/README_Skills.md` path (the file actually lives
+  at repo root); fixed `README_Skills.md`'s own unclosed code-fence wrapper; stripped leftover
+  LLM chat preamble from `docs/skills.md`; gave the roadmap's orphaned Milestone 5 bullets a
+  proper heading matching M1-M4's style.
+- **py-coding-agent lifecycle one-pager + cross-project reference redaction** (PR #84): added
+  `kb-template/knowledge/raw/py-coding-agent_Lifecycle_Graph_OnePager.md` (scoped only to this
+  repo, per explicit user instruction not to reference other projects); deleted a stray
+  TradeForge-scoped draft of the same file; genericized four pre-existing docs
+  (`docs/ISSUES.md`, `docs/NEXT_ACTIONS.md`, `docs/SESSION_LOG.md`,
+  `specs/001-kb-template/spec.md`) that had named specific outside projects, replacing the names
+  with generic phrasing while keeping the underlying rationale.
+- **`capture-brainstorm-note` skill + file/spec ISS-009** (PR #85): added a project-scoped
+  Claude Code skill (`.claude/skills/` + `.agents/skills/` mirror) adapted to this repo's actual
+  `kb-template` schema; used it to capture a real bug hit live via `/skill generate_skill`
+  (Ollama returning empty content for thinking-capable models); filed `docs/ISSUES.md` ISS-009;
+  ran it through Spec Kit's specify phase (`specs/005-fix-ollama-thinking-response/spec.md` +
+  checklist) — capture and spec only, no fix, per explicit instruction to route the fix through
+  spec-driven development rather than hot-patch from chat.
+- **Fix ISS-009** (this session, branch `fix-ollama-thinking-response`, not yet merged): ran
+  `/speckit-plan` and `/speckit-tasks`, then implemented. The fix went through two rounds of
+  empirical correction during planning — see `specs/005-fix-ollama-thinking-response/research.md`
+  for the full account:
+  - Initially (following the original chat-based diagnosis) tested `think: false` against this
+    repo's *local* default model (`lfm2.5-thinking:latest`) and found it didn't suppress
+    reasoning at all — looked like clear grounds to reject it and rely on
+    `options.num_predict`/`num_ctx` alone.
+  - Testing against the *actual* model from the bug report (`qwen3.5:4b`, on the configured
+    remote host) reversed that conclusion: `think: false` genuinely eliminates reasoning and its
+    token cost for that model (`eval_count: 3` for a trivial prompt, vs. thousands when
+    reasoning). Final design uses both: `think: false` by default
+    (`OLLAMA_ENABLE_THINKING`, default off) as the primary, near-zero-cost fix for compliant
+    models, plus `options.num_predict`/`num_ctx` (`OLLAMA_NUM_PREDICT=4096`,
+    `OLLAMA_NUM_CTX=8192`) as a safety net for non-compliant models like `lfm2.5-thinking`.
+  - Also discovered mid-implementation: the previously-hardcoded `requests.post(timeout=300)`
+    was insufficient for the safety-net path alone (raised `ReadTimeout` in real testing against
+    `qwen3.5:4b` at `num_predict=4096`) — raised to `OLLAMA_REQUEST_TIMEOUT` (default 600s).
+  - The final exact payload combination (`think: false` + budget) was validated end-to-end
+    against both real models this agent actually uses, not just individually or via mocks.
+
+**Files changed**:
+- PR #83: `README.md`, `README_Skills.md`, `docs/skills.md`.
+- PR #84: `kb-template/knowledge/raw/py-coding-agent_Lifecycle_Graph_OnePager.md` (added),
+  `kb-template/knowledge/raw/TradeForge_Lifecycle_Graph_OnePager.md` (deleted, untracked),
+  `docs/ISSUES.md`, `docs/NEXT_ACTIONS.md`, `docs/SESSION_LOG.md`, `specs/001-kb-template/spec.md`.
+- PR #85: `.claude/skills/capture-brainstorm-note/SKILL.md`, `.agents/skills/capture-brainstorm-note/SKILL.md`,
+  `kb-template/knowledge/raw/brainstorm-20260805-ollama-thinking-empty-response.md`,
+  `docs/ISSUES.md`, `.specify/feature.json`, `specs/005-fix-ollama-thinking-response/spec.md`,
+  `specs/005-fix-ollama-thinking-response/checklists/requirements.md`.
+- This session (commit `8acaede`, branch `fix-ollama-thinking-response`, not yet merged):
+  `py_mono/config.py`, `py_mono/llm/ollama_provider.py`, `tests/llm/test_ollama_provider.py`,
+  `docs/ISSUES.md`, `specs/005-fix-ollama-thinking-response/{plan,research,data-model,quickstart,tasks}.md`,
+  `specs/005-fix-ollama-thinking-response/contracts/ollama-chat-request-contract.md`.
+
+**Design decisions**:
+- Fix lives entirely in the shared `OllamaProvider` (constitution Principle II), not per-skill —
+  every Ollama-backed call in the agent benefits, not just `generate_skill`.
+- Chose empirical testing against real running Ollama servers (both local and the configured
+  remote host) over trusting either the original chat-based diagnosis or a first round of
+  incomplete testing — the two corrections during planning (see above) would not have been
+  caught otherwise, and materially changed the final design.
+- Kept `docs/ISSUES.md`, `docs/NEXT_ACTIONS.md`, `docs/SESSION_LOG.md`, and
+  `specs/001-kb-template/spec.md` free of references to projects outside this repo, per explicit
+  user instruction — redacted specific project names to generic phrasing rather than deleting
+  the underlying historical reasoning.
+
+**Validation**:
+- `pytest tests/llm/test_ollama_provider.py -v` — 11/11 passed (7 new tests added for this
+  feature, 4 pre-existing).
+- `pytest -q --ignore=tests/test_listallpy_skill.py` — 97 passed, 1 skipped, 2 failed (both the
+  pre-existing, already-tracked `ISS-005` failures — unrelated, unchanged by this work).
+- `kb-template/validator/validate.py .` — 16/16 files passed (run during PR #84/#85 work).
+- Empirical end-to-end validation against real Ollama servers (not just mocks) for the exact
+  payload shape now shipped, against both `qwen3.5:4b` (remote) and `lfm2.5-thinking:latest`
+  (local) — see `specs/005-fix-ollama-thinking-response/research.md` for full transcripts and
+  reasoning.
+
+**Open items**:
+- `fix-ollama-thinking-response` branch not yet pushed/merged (implementation commit `8acaede`;
+  `docs/ISSUES.md` ISS-009 already flipped to `done` referencing that hash, matching how
+  ISS-002/ISS-003 cite their branch's own commits rather than waiting for the merge commit —
+  this repo merges via real merge commits, so the hash persists on `main` after merge).
+- Model-swap follow-up (lighter, non-thinking, code-tuned model for structured generation tasks)
+  discussed and left as an explicit, separate, undecided next action — see
+  `docs/NEXT_ACTIONS.md` and `docs/CURRENT_FOCUS.md`.
+- `ISS-005`, `ISS-006`, `ISS-008` remain open, untouched by this session.
+
+**Next safe action**: Review the `fix-ollama-thinking-response` branch, push, and open a PR into
+`main`.
+
 **Design decisions**:
 - `kb-template/` ships its own minimal `pyproject.toml` (PyYAML only) rather than relying
   on this repo's environment, so it's genuinely standalone-portable — verified by running

@@ -2,6 +2,12 @@
 
 import os
 import requests
+from py_mono.config import (
+    OLLAMA_ENABLE_THINKING,
+    OLLAMA_NUM_PREDICT,
+    OLLAMA_NUM_CTX,
+    OLLAMA_REQUEST_TIMEOUT,
+)
 from py_mono.llm.base import LLMProvider
 from py_mono.llm.tool_schema import build_tool_schemas
 from typing import Optional
@@ -87,11 +93,26 @@ class OllamaProvider(LLMProvider):
         """
         wire_messages = self.to_wire_messages(messages)
 
+        # Two defenses against a thinking-capable model exhausting its budget on internal
+        # reasoning and returning empty content with done_reason "length" (empirically
+        # confirmed, see specs/005-fix-ollama-thinking-response/research.md):
+        #   1. "think": False — genuinely eliminates reasoning (and its token cost) for models
+        #      with native Ollama thinking support (e.g. qwen3.5:4b). Confirmed harmless/ignored
+        #      on non-thinking models (e.g. granite4:350m).
+        #   2. options.num_predict/num_ctx — safety net for models that ignore #1 entirely
+        #      (e.g. lfm2.5-thinking:latest reasons regardless of the "think" field) or when
+        #      OLLAMA_ENABLE_THINKING explicitly re-enables reasoning.
         payload = {
             "model": self.model_name,
             "messages": wire_messages,
-            "stream": False
+            "stream": False,
+            "options": {
+                "num_predict": OLLAMA_NUM_PREDICT,
+                "num_ctx": OLLAMA_NUM_CTX,
+            },
         }
+        if not OLLAMA_ENABLE_THINKING:
+            payload["think"] = False
         if tools:
             payload["tools"] = build_tool_schemas(tools)
 
@@ -102,7 +123,7 @@ class OllamaProvider(LLMProvider):
         resp = requests.post(
             f"{self.base_url}/api/chat",
             json=payload,
-            timeout=300
+            timeout=OLLAMA_REQUEST_TIMEOUT
         )
         if not resp.ok:
             # Log raw error from Ollama
