@@ -77,11 +77,19 @@ modes every session.
    Originally scoped as an M7 shared dependency, pulled forward into M6 since `ISS-014` needs it
    and M6 ships first; M7 extends this same log rather than building a second one. See
    [[ISSUES]] and `specs/011-add-skill-run-telemetry/`.
-7. **`ISS-014`** — model/task fitness check: warn before a heavy generation call if the
-   configured model looks like a poor fit for structured output. The clearest "bug we hit →
-   feature that prevents the next one" line of anything discussed this session — directly
-   productizes the `ISS-009`/`ISS-011` lesson (thinking models reasoning verbosely/unreliably on
-   template-filling tasks). Depends on `ISS-013` — sequence last within M6.
+7. **`ISS-014`** — **done.** `py_mono/skill/fitness.py`'s `check_model_fitness` warns when a
+   (skill, provider, model) combination has recently failed at least half its runs (min. 3
+   samples, most recent 5 considered), prepended to the result via `run_skill_safe`. The
+   clearest "bug we hit → feature that prevents the next one" line of anything discussed this
+   session — directly productizes the `ISS-009`/`ISS-011` lesson. See [[ISSUES]] and
+   `specs/012-add-model-task-fitness-check/`.
+
+**Note on this branch's view:** every M6 scope item above has a merged-or-open fix from this
+session (`ISS-005` #96, `ISS-006` #97, `ISS-010` #98, `ISS-011` #99, `ISS-012` #100, `ISS-013`
+#101, `ISS-014` — this branch). This branch only has `ISS-013` merged in alongside its own work,
+so its own copy of the Open/Tracked Index above still lists the others as open until each PR
+actually merges — update the Status line and Milestone Index once all seven have landed on
+`main`, rather than trusting this note in isolation.
 
 ---
 

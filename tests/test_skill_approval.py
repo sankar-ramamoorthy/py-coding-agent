@@ -211,3 +211,61 @@ def test_run_with_no_session_manager_does_not_crash(monkeypatch):
     run_skill_safe(registry, "allowed_only", "/skill allowed_only", context)
 
     assert logged == [("<unknown>", "<unknown>")]
+
+
+# ---------------------------------------------------------------------------
+# ISS-014: run_skill_safe prepends a fitness warning when one is returned
+# ---------------------------------------------------------------------------
+
+def test_fitness_warning_is_prepended_to_a_successful_result(monkeypatch):
+    skill = UsesAllowedToolSkill()
+    registry = StubRegistry(
+        skill,
+        {"allowed_only": {"status": "approved", "allowed_tools": ["list_files"]}},
+    )
+
+    monkeypatch.setattr("py_mono.skill.approval.log_skill_run", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "py_mono.skill.approval.check_model_fitness",
+        lambda skill, provider, model: "⚠️ Fitness warning: test warning",
+    )
+
+    result = run_skill_safe(registry, "allowed_only", "/skill allowed_only", make_context())
+
+    assert result.startswith("⚠️ Fitness warning: test warning")
+    assert result.endswith("ok")  # the skill's real result is still present
+
+
+def test_no_fitness_warning_prefix_when_none_returned(monkeypatch):
+    skill = UsesAllowedToolSkill()
+    registry = StubRegistry(
+        skill,
+        {"allowed_only": {"status": "approved", "allowed_tools": ["list_files"]}},
+    )
+
+    monkeypatch.setattr("py_mono.skill.approval.log_skill_run", lambda *a, **k: None)
+    monkeypatch.setattr("py_mono.skill.approval.check_model_fitness", lambda skill, provider, model: None)
+
+    result = run_skill_safe(registry, "allowed_only", "/skill allowed_only", make_context())
+
+    assert result == "ok"
+
+
+def test_fitness_warning_is_not_shown_on_a_failed_run(monkeypatch):
+    """A fitness warning is only useful attached to a result the caller
+    actually receives - a failed run raises instead, so there's no result to
+    prepend it to."""
+    skill = FailingSkill()
+    registry = StubRegistry(
+        skill,
+        {"failing_skill": {"status": "approved", "allowed_tools": ["list_files"]}},
+    )
+
+    monkeypatch.setattr("py_mono.skill.approval.log_skill_run", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "py_mono.skill.approval.check_model_fitness",
+        lambda skill, provider, model: "⚠️ Fitness warning: test warning",
+    )
+
+    with pytest.raises(RuntimeError, match="execution failed"):
+        run_skill_safe(registry, "failing_skill", "/skill failing_skill", make_context())
