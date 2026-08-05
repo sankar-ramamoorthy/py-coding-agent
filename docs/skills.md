@@ -213,6 +213,54 @@ myapp/
 ❌ Invalid type 'web'. Must be: lib|app
 ---
 
+## 7. hello
+
+*Purpose:* Trivial example skill that echoes its input. Verifies the skills layer is wired up without doing anything risky.
+
+*Location:* `skills/hello/`
+
+*Trigger:* `/skill hello [message]`
+
+*Allowed tools:* none
+
+*Constraints:*
+- No side effects — echoes the request back, nothing else
+
+*Example:*
+```
+/skill hello world
+Output: [HELLO SKILL] Got request: '/skill hello world'
+```
+
+---
+
+## 8. listallpy
+
+*Purpose:* List all `*.py` files in the workspace.
+
+*Location:* `skills/listallpy/`
+
+*Trigger:* `/skill listallpy`
+
+*Allowed tools:* `list_files` (per `SKILL.md`)
+
+*Constraints:*
+- Workspace only
+- No network access
+
+*Example:*
+```
+/skill listallpy
+Output: app.py
+        csv_summary.py
+        hello.py
+```
+
+*Note:* generated live via `/skill generate_skill` — see `docs/ISSUES.md` ISS-011 for known
+output-quality gaps in the `generate_skill` path (not specific to this skill).
+
+---
+
 ## Deprecated Skills
 
 ### generate_skill

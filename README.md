@@ -365,6 +365,9 @@ See [`README_Skills.md`](./README_Skills.md) for the skills-layer architecture (
 
 *(Milestone 5 shipped ahead of Milestone 4 — the skills layer above is implemented and in active use; M4's polish items remain open.)*
 
+See [`docs/ROADMAP_PLAN.md`](./docs/ROADMAP_PLAN.md) for Milestone 6 onward — that file is the
+maintained source of truth for future milestones, so it isn't duplicated here.
+
 ---
 
 ### Future Enhancements (V2)
