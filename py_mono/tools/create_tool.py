@@ -12,7 +12,7 @@ VALID_TOOL_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 def create_tool(name, code):
     if not VALID_TOOL_NAME.fullmatch(name):
-        return "Invalid tool name."
+        return "Error: tool name must be a valid Python identifier."
 
     try:
         TOOLS_DIR.mkdir(parents=True, exist_ok=True)
@@ -65,7 +65,7 @@ from py_mono.tools.tool import Tool
 
         path.write_text(wrapped_code, encoding="utf-8")
 
-        return f"✅ Tool '{name}' created with schema."
+        return f"✅ Tool '{name}' created with schema: {path}"
 
     except Exception as exc:
         return f"Error creating tool {name}: {exc}"

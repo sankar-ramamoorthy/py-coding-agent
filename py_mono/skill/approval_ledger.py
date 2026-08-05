@@ -30,7 +30,17 @@ def ledger_path_for(skills_dir: Path) -> Path:
 
 
 def hash_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Hash content with line endings normalized to `\n`.
+
+    Git's `core.autocrlf` rewrites a text file's on-disk line endings
+    depending on the checking-out platform (e.g. CRLF on native Windows,
+    LF in CI/Linux/Docker) even though the tracked content is identical.
+    Hashing raw bytes made approval silently invalidate itself purely from a
+    platform-different checkout, with no content change at all — normalize
+    first so the recorded hash matches across platforms.
+    """
+    normalized = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(normalized).hexdigest()
 
 
 def load_ledger(path: Path) -> Dict[str, dict]:
