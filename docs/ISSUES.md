@@ -21,8 +21,13 @@ file tracks discrete, open pieces of work and known problems across sessions.
 | **ID** | Sequential, prefixed `ISS-NNN` (zero-padded, 3 digits, monotonically increasing, never reused) |
 | **Title** | Short description |
 | **Status** | See Status Values below |
+| **Milestone** | Which `docs/ROADMAP_PLAN.md` milestone this belongs to (`—` if pre-roadmap / not milestone-tracked) |
 | **Branch** | Branch working the issue, if any (`—` if none yet) |
 | **Source** | Where it originated — audit report, session date, requester |
+
+Every piece of tracked work gets an issue here, including items that originate as roadmap
+candidates — see `docs/ROADMAP_PLAN.md`'s Authority Model. A roadmap milestone's scope should
+resolve to `ISS-NNN` entries here, not stay as an un-filed bullet once work is about to start.
 
 Longer context (root cause, fix details, links to files/ADRs/commits/specs) lives in each
 issue's own section below the index, not in the index table — keeps the table scannable.
@@ -39,30 +44,34 @@ issue's own section below the index, not in the index table — keeps the table 
 
 ## Open / Tracked Index
 
-| ID | Status | Title | Branch |
-| --- | --- | --- | --- |
-| ISS-005 | open | Pre-existing test failures unrelated to current branch work | — |
-| ISS-006 | open | `pyyaml` used transitively but not declared as a direct dependency | — |
-| ISS-008 | open | Full isolated-worker execution for skills/dynamic tools | — |
-| ISS-010 | open | Bare `/provider` silently falls through to the LLM | — |
-| ISS-011 | open | `generate_skill` output-quality gaps found dogfooding | — |
+| ID | Status | Milestone | Title | Branch |
+| --- | --- | --- | --- | --- |
+| ISS-005 | open | M6 | Pre-existing test failures unrelated to current branch work | — |
+| ISS-006 | open | M6 | `pyyaml` used transitively but not declared as a direct dependency | — |
+| ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
+| ISS-010 | open | M6 | Bare `/provider` silently falls through to the LLM | — |
+| ISS-011 | open | M6 | `generate_skill` output-quality gaps found dogfooding | — |
+| ISS-012 | open | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | — |
+| ISS-013 | open | M6 | Add lightweight per-run telemetry log | — |
+| ISS-014 | open | M6 | Add model/task fitness check | — |
 
 ## Closed Index
 
-| ID | Status | Title | Branch |
-| --- | --- | --- | --- |
-| ISS-001 | done | App fails to import/start (syntax errors) | — |
-| ISS-002 | done | `/workspace` sandbox escape via path-check bypass | fix-workspace-sandbox |
-| ISS-003 | done | Skills/dynamic tools execute arbitrary code before approval | fix-skill-tool-approval-gate |
-| ISS-004 | done | Add `kb-template/` portable knowledge-base scaffold | kb-template |
-| ISS-007 | done | Add dual Ollama backend selection with runtime model switching | ollama-dual-backend |
-| ISS-009 | done | `OllamaProvider` returns empty content for thinking-capable models | fix-ollama-thinking-response |
+| ID | Status | Milestone | Title | Branch |
+| --- | --- | --- | --- | --- |
+| ISS-001 | done | M5 | App fails to import/start (syntax errors) | — |
+| ISS-002 | done | M5 | `/workspace` sandbox escape via path-check bypass | fix-workspace-sandbox |
+| ISS-003 | done | M5 | Skills/dynamic tools execute arbitrary code before approval | fix-skill-tool-approval-gate |
+| ISS-004 | done | M5 | Add `kb-template/` portable knowledge-base scaffold | kb-template |
+| ISS-007 | done | M5 | Add dual Ollama backend selection with runtime model switching | ollama-dual-backend |
+| ISS-009 | done | M5 | `OllamaProvider` returns empty content for thinking-capable models | fix-ollama-thinking-response |
 
 ---
 
 ## Open / Tracked — Detail
 
 ### ISS-005 — Pre-existing test failures unrelated to current branch work
+- **Milestone:** M6 — prerequisite for `ISS-012` (CI can't be green-required with known red tests)
 - **Source:** discovered 2026-08-03 verifying `kb-template`
 - **What:**
   - `tests/test_listallpy_skill.py` fails to collect (`ModuleNotFoundError: No module named
@@ -77,6 +86,7 @@ issue's own section below the index, not in the index table — keeps the table 
   `docs/ROADMAP_PLAN.md`) — can't gate merges on a suite with known, undiagnosed red tests
 
 ### ISS-006 — `pyyaml` used transitively but not declared as a direct dependency
+- **Milestone:** M6
 - **Source:** discovered 2026-08-03 during `kb-template` planning; unbundled 2026-08-03 per
   external PR review
 - **What:** `py_mono/skill/validator.py`, `py_mono/skill/base.py`, and
@@ -88,6 +98,7 @@ issue's own section below the index, not in the index table — keeps the table 
 - **Scope:** separate, pre-existing hygiene gap, not a `kb-template` requirement
 
 ### ISS-008 — Full isolated-worker execution for skills/dynamic tools
+- **Milestone:** Gated / deferred — prerequisite for M8, not part of M6
 - **Source:** `docs/project-audit-2026-08-02.md` (C-03) remediation, deferred 2026-08-03 during
   ISS-003
 - **What:** the audit's full C-03 recommendation was "execute approved extensions in an isolated
@@ -99,6 +110,7 @@ issue's own section below the index, not in the index table — keeps the table 
   Milestone 8 (`docs/ROADMAP_PLAN.md`), not just "eventually"
 
 ### ISS-010 — Bare `/provider` silently falls through to the LLM
+- **Milestone:** M6
 - **Source:** 2026-08-05 session, user hit it live in the CLI
 - **What:** `py_mono/agent/agent.py`'s `_is_special_command`/`_handle_special_command` only
   match `text.startswith("/provider ")` (trailing space + argument required) or the exact
@@ -111,6 +123,7 @@ issue's own section below the index, not in the index table — keeps the table 
   explicit instruction, not fixed inline
 
 ### ISS-011 — `generate_skill` output-quality gaps found dogfooding
+- **Milestone:** M6
 - **Source:** 2026-08-05 session, user hit it live running
   `/skill generate_skill listallpy | ...` after switching to a coding-tuned model; reviewed with
   claude.ai, both findings re-verified against the actual code before filing
@@ -137,16 +150,48 @@ issue's own section below the index, not in the index table — keeps the table 
      offload logs, not a code fix in this repo.
 - **Fix:** deferred — to be routed through Spec Kit per explicit instruction, not fixed inline
 
+### ISS-012 — Add minimal CI (`pytest` + `compileall` on every PR)
+- **Milestone:** M6
+- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope
+- **What:** there is currently no CI or pre-commit enforcement anywhere in this repo. Every
+  regression check this session was a human manually running `pytest`. Add a CI workflow that
+  runs `pytest` and `python -m compileall` on every PR.
+- **Depends on:** `ISS-005` — can't make CI green-required (block merges on failure) while the
+  suite has known, undiagnosed red tests. `ISS-005` should land first.
+- **Fix:** not started — to be routed through Spec Kit
+
+### ISS-013 — Add lightweight per-run telemetry log
+- **Milestone:** M6
+- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope (originally described as a
+  shared dependency for M7, pulled forward into M6 since `ISS-014` needs it and M6 ships first)
+- **What:** a flat per-run log (`skill`, `provider`, `model`, `duration`, `success`) recorded
+  each time a skill runs. Minimal version only — Milestone 7's failure-driven evolution will
+  extend this same log rather than building a second one.
+- **Blocks:** `ISS-014` (fitness check has no data source without this)
+- **Fix:** not started — to be routed through Spec Kit
+
+### ISS-014 — Add model/task fitness check
+- **Milestone:** M6
+- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope
+- **What:** warn before a heavy generation call if the configured model looks like a poor fit
+  for structured output. Directly productizes the `ISS-009`/`ISS-011` lesson (thinking models
+  reasoning verbosely/unreliably on template-filling tasks).
+- **Depends on:** `ISS-013` — needs the per-run telemetry log to have data to check fitness
+  against. Sequence last within M6.
+- **Fix:** not started — to be routed through Spec Kit
+
 ---
 
 ## Closed — Detail
 
 ### ISS-001 — App fails to import/start (syntax errors)
+- **Milestone:** M5
 - **Source:** `docs/project-audit-2026-08-02.md` (C-01)
 - **Fix:** confirmed 2026-08-03: `python -m compileall -q py_mono skills kb-template` exits 0.
   Landed in commit `34e595e` ("fixed syntax errors and tested system")
 
 ### ISS-002 — `/workspace` sandbox escape via path-check bypass
+- **Milestone:** M5
 - **Source:** `docs/project-audit-2026-08-02.md` (C-02)
 - **Fix:** landed in commits `71a9ffa`, `ad8eb20` on branch `fix-workspace-sandbox`
   - Real path containment (`Path.is_relative_to`) replaces the string-prefix check
@@ -160,6 +205,7 @@ issue's own section below the index, not in the index table — keeps the table 
   `specs/003-fix-workspace-sandbox/`
 
 ### ISS-003 — Skills/dynamic tools execute arbitrary code before approval
+- **Milestone:** M5
 - **Source:** `docs/project-audit-2026-08-02.md` (C-03)
 - **Fix:** landed in commits `d4cddfa`, `f542ccc` on branch `fix-skill-tool-approval-gate`
   - `SkillRegistry.load()`/`reload_skill()` gated on a hash-ledger approval record
@@ -178,6 +224,7 @@ issue's own section below the index, not in the index table — keeps the table 
   inside the real container. See `specs/004-fix-skill-tool-approval-gate/`
 
 ### ISS-004 — Add `kb-template/` portable knowledge-base scaffold
+- **Milestone:** M5
 - **Source:** 2026-08-03 session
 - **Fix:** landed in commits `1dd949f`, `b12cc64`, `c3f8f80` on branch `kb-template`
 - **What:** reusable YAML front-matter + Obsidian-markdown scaffold with a standalone
@@ -185,6 +232,7 @@ issue's own section below the index, not in the index table — keeps the table 
   `specs/001-kb-template/`
 
 ### ISS-007 — Add dual Ollama backend selection with runtime model switching
+- **Milestone:** M5
 - **Source:** 2026-08-03 session, user request
 - **Fix:** landed in commits `bf1e23b`, `550a51d` on branch `ollama-dual-backend`
 - **What:** adds `ollama-remote`/`ollama-local`/`ollama-auto` `provider_registry.py` entries
@@ -196,6 +244,7 @@ issue's own section below the index, not in the index table — keeps the table 
   `specs/002-ollama-dual-backend/`
 
 ### ISS-009 — `OllamaProvider` returns empty content for thinking-capable models
+- **Milestone:** M5
 - **Source:** 2026-08-05 session, user hit it live via `/skill generate_skill`
 - **What:** `OllamaProvider.generate()` sent no `think`/`num_predict`/`num_ctx`, letting a
   thinking-capable model (e.g. `qwen3.5:4b`) exhaust its budget on internal reasoning and return
