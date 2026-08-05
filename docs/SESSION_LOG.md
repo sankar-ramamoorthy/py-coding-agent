@@ -60,7 +60,7 @@ commit's session-doc updates (`docs/ISSUES.md`, `docs/SESSION_LOG.md`,
 - ISS-002, ISS-003 (sandbox/execution security issues) — untouched, deliberately out of
   scope for this branch.
 - ISS-005 (pre-existing test failures) — newly logged, not fixed, unrelated to this work.
-- kb-template/ repo split, TradeForge-KnowledgeBase/AITrader migration onto this schema,
+- kb-template/ repo split, migrating other internal knowledge-base projects onto this schema,
   and CI/pre-commit wiring for the validator all remain explicitly deferred future work.
 - Branch `kb-template` has not been pushed or opened as a PR — left ready locally per
   the session's scope (no merge/push authorized).

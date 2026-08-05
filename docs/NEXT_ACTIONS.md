@@ -15,4 +15,4 @@ don't just delete — `SESSION_LOG.md` keeps the record.
       collection error and the two failing `tests/tools/test_create_tool.py` assertions
 - [ ] (Later, separate work) `ISS-006`: declare `pyyaml` explicitly in the root `pyproject.toml`
 - [ ] (Later, separate work) Decide on splitting `kb-template/` into its own repo
-- [ ] (Later, separate work) Consider migrating TradeForge-KnowledgeBase / AITrader onto the schema
+- [ ] (Later, separate work) Consider migrating other internal knowledge-base projects onto the schema
