@@ -230,15 +230,30 @@ def validate_skill_py(code: str, skill_name: str) -> SkillPyValidationResult:
 # Helpers
 # ---------------------------------------------------------------------------
 
+_FENCE_BLOCK_RE = re.compile(r"```[ \t]*[A-Za-z0-9_+-]*[ \t]*\r?\n(.*?)```", re.DOTALL)
+
+
 def _strip_markdown_fences(code: str) -> str:
+    """Strip a Markdown code fence from LLM output before parsing/saving it.
+
+    Handles three shapes the previous, leading-fence-only version missed
+    (ISS-011): a fence with preamble text before it (e.g. "Here's the
+    code:\\n```python\\n..."), a trailing-only fence with no leading fence,
+    and any lone leading/trailing fence left over once a full block is
+    stripped.
+    """
     code = code.strip()
-    if code.startswith("```"):
-        lines = code.splitlines()
+
+    match = _FENCE_BLOCK_RE.search(code)
+    if match:
+        return match.group(1).strip("\n")
+
+    lines = code.splitlines()
+    if lines and lines[0].strip().startswith("```"):
         lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        code = "\n".join(lines)
-    return code
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
 
 def _find_skill_subclasses(tree: ast.Module) -> List[ast.ClassDef]:
     result = []
