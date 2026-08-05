@@ -50,7 +50,7 @@ a separate, later decision.
 
 ## M6 — Reliability Foundation
 
-**Status:** Draft, in progress (`ISS-005`, `ISS-006`, `ISS-010`, `ISS-012` done)
+**Status:** Draft, in progress (`ISS-005`, `ISS-006`, `ISS-010`, `ISS-011`, `ISS-012` done)
 
 **Why first:** two independent PM-style passes this session converged on the same conclusion —
 the core generate → approve → run loop is still shedding new bugs (`ISS-009`, `ISS-011` both
@@ -68,9 +68,10 @@ modes every session.
    `specs/007-add-pyyaml-direct-dependency/`.
 3. **`ISS-010`** — **done.** Bare `/provider` now shows usage instead of falling through to the
    LLM. See [[ISSUES]] and `specs/008-fix-bare-provider-command/`.
-4. **`ISS-011`** — `generate_skill` fence-stripping + prompt-placeholder-leak fixes. Two code
-   fixes (`py_mono/skill/validator.py`, `py_mono/skill/prompts.py`) plus one non-code
-   investigation (`ollama ps`, possible CPU-bound/unoffloaded inference).
+4. **`ISS-011`** — **done.** Fence-stripping fixed (`py_mono/skill/validator.py`) and the leaked
+   prompt-placeholder line fixed (`py_mono/skill/prompts.py`). The non-code investigation
+   confirmed the remote Ollama backend isn't GPU-offloading at all (`size_vram: 0`), explaining
+   the near-parity throughput. See [[ISSUES]] and `specs/009-generate-skill-quality-issues/`.
 5. **`ISS-012`** — **done.** `.github/workflows/ci.yml` runs `pytest` + `python -m compileall`
    on every PR and on push to `main`. Validated locally against `ISS-005`'s fix before adding —
    green. Making it *required* (branch protection) is a separate, repo-owner-only step, not done

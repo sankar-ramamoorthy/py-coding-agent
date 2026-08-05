@@ -71,7 +71,8 @@ constraints: [brief human-readable constraints, e.g. "read-only, workspace only,
 
 # {skill_name}
 
-One paragraph explaining what this skill does.
+[INSTRUCTION — replace this bracketed line with one paragraph explaining what this skill does.
+Do not include this instruction, the brackets, or the word "INSTRUCTION" in your output.]
 
 ## Usage
 
@@ -83,16 +84,21 @@ One paragraph explaining what this skill does.
 
 ## Expected Output
 
-Brief description of what the user will see.
+[INSTRUCTION — replace this bracketed line with a brief description of what the user will see.
+Do not include this instruction, the brackets, or the word "INSTRUCTION" in your output.]
 
 ## Constraints
 
-- List each constraint as a bullet point.
+[INSTRUCTION — replace this bracketed line with 1-3 real constraints, each its own bullet point,
+e.g. "- Read-only, no writes to disk." Do not include this instruction, the brackets, or the
+word "INSTRUCTION" in your output.]
 
 Rules:
 - status MUST be "proposed" — never "approved"
 - allowed_tools must only contain tools from the available tools list above
 - Keep it concise and human-readable
+- Every [INSTRUCTION — ...] bracketed line above is a placeholder for YOU to replace with real
+  content — never copy an [INSTRUCTION — ...] line itself into the output
 """
 
 
