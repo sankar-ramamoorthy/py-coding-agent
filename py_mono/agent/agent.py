@@ -93,7 +93,7 @@ class Agent:
 
     def _is_special_command(self, text: str) -> bool:
         text = text.strip()
-        if text in ("/clear", "/bye", "/providers", "/reload_tools"):
+        if text in ("/clear", "/bye", "/providers", "/reload_tools", "/provider"):
             return True
         if text.startswith("/provider "):
             return True
@@ -136,6 +136,9 @@ class Agent:
 
         if text == "/reload_tools":
             return self._reload_dynamic_tools()
+
+        if text == "/provider":
+            return "Usage: /provider <provider> [model]"
 
         if text.startswith("/provider "):
             parts = text.split(maxsplit=2)

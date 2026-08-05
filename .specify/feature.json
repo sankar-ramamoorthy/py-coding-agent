@@ -1,3 +1,3 @@
 {
-  "feature_directory": "specs/007-add-pyyaml-direct-dependency"
+  "feature_directory": "specs/008-fix-bare-provider-command"
 }
