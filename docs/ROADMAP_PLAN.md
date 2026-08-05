@@ -66,9 +66,10 @@ modes every session.
 2. **`ISS-006`** — declare `pyyaml` as a direct dependency. Small, mechanical.
 3. **`ISS-010`** — bare `/provider` falls through to the LLM. Small, well-scoped — usage-message
    fix in `py_mono/agent/agent.py`.
-4. **`ISS-011`** — `generate_skill` fence-stripping + prompt-placeholder-leak fixes. Two code
-   fixes (`py_mono/skill/validator.py`, `py_mono/skill/prompts.py`) plus one non-code
-   investigation (`ollama ps`, possible CPU-bound/unoffloaded inference).
+4. **`ISS-011`** — **done.** Fence-stripping fixed (`py_mono/skill/validator.py`) and the leaked
+   prompt-placeholder line fixed (`py_mono/skill/prompts.py`). The non-code investigation
+   confirmed the remote Ollama backend isn't GPU-offloading at all (`size_vram: 0`), explaining
+   the near-parity throughput. See [[ISSUES]] and `specs/009-generate-skill-quality-issues/`.
 5. **`ISS-012`** — minimal CI (`pytest` + `python -m compileall` on every PR). Motivated
    directly by pre-existing untriaged test failures; every regression check before this was a
    human manually running `pytest`. Depends on `ISS-005` landing first.

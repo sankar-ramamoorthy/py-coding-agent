@@ -50,7 +50,6 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-006 | open | M6 | `pyyaml` used transitively but not declared as a direct dependency | — |
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
 | ISS-010 | open | M6 | Bare `/provider` silently falls through to the LLM | — |
-| ISS-011 | open | M6 | `generate_skill` output-quality gaps found dogfooding | — |
 | ISS-012 | open | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | — |
 | ISS-013 | open | M6 | Add lightweight per-run telemetry log | — |
 | ISS-014 | open | M6 | Add model/task fitness check | — |
@@ -65,6 +64,7 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-004 | done | M5 | Add `kb-template/` portable knowledge-base scaffold | kb-template |
 | ISS-007 | done | M5 | Add dual Ollama backend selection with runtime model switching | ollama-dual-backend |
 | ISS-009 | done | M5 | `OllamaProvider` returns empty content for thinking-capable models | fix-ollama-thinking-response |
+| ISS-011 | done | M6 | `generate_skill` output-quality gaps found dogfooding | fix-generate-skill-quality-issues |
 
 ---
 
@@ -121,34 +121,6 @@ issue's own section below the index, not in the index table — keeps the table 
   (the correct form) switched providers normally
 - **Fix:** deferred — to be routed through Spec Kit (specify → plan → tasks → implement) per
   explicit instruction, not fixed inline
-
-### ISS-011 — `generate_skill` output-quality gaps found dogfooding
-- **Milestone:** M6
-- **Source:** 2026-08-05 session, user hit it live running
-  `/skill generate_skill listallpy | ...` after switching to a coding-tuned model; reviewed with
-  claude.ai, both findings re-verified against the actual code before filing
-- **Context:** three related findings from one *successful* (not failing) run — the underlying
-  ISS-009 fix worked; these are quality/robustness gaps in `generate_skill` itself
-- **What:**
-  1. **Fence-stripping isn't symmetric-only safe** — `_strip_markdown_fences()`
-     (`py_mono/skill/validator.py:233`) only strips a leading fence if the whole output starts
-     with one, and only strips a trailing fence if a leading one was already found. A
-     trailing-only fence leaves a stray `` ``` `` in the output; any preamble before the fence
-     (e.g. "Here's the code:\n```python...") isn't stripped at all and would fail `ast.parse()`
-     outright. Didn't manifest this run only because the model happened to fence symmetrically
-     with no preamble.
-  2. **Leaked template placeholder line** — `py_mono/skill/prompts.py:90` contains `- List each
-     constraint as a bullet point.`, phrased identically to a real constraint bullet, with
-     nothing marking it as instructional text to replace rather than content to keep. The model
-     echoed it back verbatim as a "constraint" in the generated `SKILL.md` (confirmed in the
-     transcript).
-  3. **Possible CPU-bound/unoffloaded inference** — both `generate_skill` LLM calls this run
-     showed prompt-processing throughput (~15 tok/s) in the same order of magnitude as
-     generation throughput (~6 tok/s); on GPU, prompt processing is normally an order of
-     magnitude faster than autoregressive generation, so near-parity suggests CPU-bound or
-     partial-GPU-offload inference — needs investigating via `ollama ps` or server-side GPU
-     offload logs, not a code fix in this repo.
-- **Fix:** deferred — to be routed through Spec Kit per explicit instruction, not fixed inline
 
 ### ISS-012 — Add minimal CI (`pytest` + `compileall` on every PR)
 - **Milestone:** M6
@@ -262,3 +234,30 @@ issue's own section below the index, not in the index table — keeps the table 
   wrong way before testing against the actual model from the bug report corrected the design —
   see `specs/005-fix-ollama-thinking-response/research.md` for the full empirical trail. Raw
   capture: `kb-template/knowledge/raw/brainstorm-20260805-ollama-thinking-empty-response.md`
+
+### ISS-011 — `generate_skill` output-quality gaps found dogfooding
+- **Milestone:** M6
+- **Source:** 2026-08-05 session, user hit it live running
+  `/skill generate_skill listallpy | ...` after switching to a coding-tuned model; reviewed with
+  claude.ai, both findings re-verified against the actual code before filing
+- **Context:** three related findings from one *successful* (not failing) run — the underlying
+  ISS-009 fix worked; these are quality/robustness gaps in `generate_skill` itself
+- **Fix:** landed on branch `fix-generate-skill-quality-issues`. Two code fixes plus one
+  non-code investigation:
+  1. **Fence-stripping** — `_strip_markdown_fences()` (`py_mono/skill/validator.py`) rewritten
+     to find a fenced code block via regex anywhere in the text, instead of requiring the
+     string to start with a fence. Fixes trailing-only fences and preamble-before-fence output.
+     Added `tests/test_skill_validator.py` (7 tests).
+  2. **Leaked template placeholder** — `py_mono/skill/prompts.py`'s
+     `build_skill_md_prompt()` fillable sections (paragraph description, expected output,
+     constraints) now marked with explicit `[INSTRUCTION — ...]` prefixes, plus a closing rule
+     telling the model never to copy an instruction marker into its output. Added
+     `tests/test_skill_prompts.py` (3 tests).
+  3. **CPU-bound/unoffloaded inference** — investigated directly against the reachable
+     `OLLAMA_REMOTE_URL` (`http://100.105.24.12:11434`): `/api/ps` after loading
+     `qwen2.5-coder:7b-instruct-q5_K_M` (the model from the original report) showed
+     `size_vram: 0` against a ~5.8 GB model — confirmed with a second model, also `size_vram: 0`.
+     The remote backend is not GPU-offloading inference at all, for any model tested, which
+     explains the originally-reported near-parity throughput. Not a code fix in this repo — see
+     `specs/009-generate-skill-quality-issues/research.md`. *Why* GPU offload isn't happening
+     would need direct access to that host's own system, out of this session's reach.
