@@ -47,7 +47,6 @@ issue's own section below the index, not in the index table — keeps the table 
 | ID | Status | Milestone | Title | Branch |
 | --- | --- | --- | --- | --- |
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
-| ISS-013 | open | M6 | Add lightweight per-run telemetry log | — |
 | ISS-014 | open | M6 | Add model/task fitness check | — |
 
 ## Closed Index
@@ -65,6 +64,7 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-010 | done | M6 | Bare `/provider` silently falls through to the LLM | fix-bare-provider-command |
 | ISS-011 | done | M6 | `generate_skill` output-quality gaps found dogfooding | fix-generate-skill-quality-issues |
 | ISS-012 | done | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | add-minimal-ci |
+| ISS-013 | done | M6 | Add lightweight per-run telemetry log | add-skill-run-telemetry |
 
 ---
 
@@ -81,16 +81,6 @@ issue's own section below the index, not in the index table — keeps the table 
   gap via a hash-ledger gate, not content-level sandboxing
 - **Status:** tracked for future consideration, not started — also a prerequisite for
   Milestone 8 (`docs/ROADMAP_PLAN.md`), not just "eventually"
-
-### ISS-013 — Add lightweight per-run telemetry log
-- **Milestone:** M6
-- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope (originally described as a
-  shared dependency for M7, pulled forward into M6 since `ISS-014` needs it and M6 ships first)
-- **What:** a flat per-run log (`skill`, `provider`, `model`, `duration`, `success`) recorded
-  each time a skill runs. Minimal version only — Milestone 7's failure-driven evolution will
-  extend this same log rather than building a second one.
-- **Blocks:** `ISS-014` (fitness check has no data source without this)
-- **Fix:** not started — to be routed through Spec Kit
 
 ### ISS-014 — Add model/task fitness check
 - **Milestone:** M6
@@ -284,3 +274,18 @@ issue's own section below the index, not in the index table — keeps the table 
 - **Scope note:** adds the workflow only — making it *required* (branch protection blocking
   merge on failure) is a separate, repo-owner-only GitHub settings change, intentionally not
   done as part of this item. See `specs/010-add-minimal-ci/`
+
+### ISS-013 — Add lightweight per-run telemetry log
+- **Milestone:** M6
+- **Source:** filed 2026-08-05 from `docs/ROADMAP_PLAN.md` M6 scope (originally described as a
+  shared dependency for M7, pulled forward into M6 since `ISS-014` needs it and M6 ships first)
+- **Fix:** landed on branch `add-skill-run-telemetry`. New `py_mono/skill/telemetry.py`
+  (`log_skill_run`/`read_skill_runs`) appends one JSON line per skill run to
+  `telemetry/skill_runs.jsonl` (`skill`, `provider`, `model`, `duration_ms`, `success`,
+  `timestamp`); a write failure logs a warning and never breaks skill execution. Hooked into
+  `run_skill_safe` (`py_mono/skill/approval.py`) — the single existing chokepoint every skill
+  execution already passes through — via `try/finally`, so both successful and failed runs are
+  logged. `telemetry/` added to `.gitignore` (matching the existing `workspace/`/
+  `dynamic_tools/` pattern; operational data, not source). Added `tests/test_skill_telemetry.py`
+  (5 tests) and 3 new tests in `tests/test_skill_approval.py`. See
+  `specs/011-add-skill-run-telemetry/`

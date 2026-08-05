@@ -50,7 +50,8 @@ a separate, later decision.
 
 ## M6 — Reliability Foundation
 
-**Status:** Draft, in progress (`ISS-005`, `ISS-006`, `ISS-010`, `ISS-011`, `ISS-012` done)
+**Status:** Draft, in progress (`ISS-005`, `ISS-006`, `ISS-010`, `ISS-011`, `ISS-012`, `ISS-013`
+done — only `ISS-014` left)
 
 **Why first:** two independent PM-style passes this session converged on the same conclusion —
 the core generate → approve → run loop is still shedding new bugs (`ISS-009`, `ISS-011` both
@@ -76,10 +77,11 @@ modes every session.
    on every PR and on push to `main`. Validated locally against `ISS-005`'s fix before adding —
    green. Making it *required* (branch protection) is a separate, repo-owner-only step, not done
    here. See [[ISSUES]] and `specs/010-add-minimal-ci/`.
-6. **`ISS-013`** — lightweight per-run telemetry (minimal version): flat log (`skill`,
-   `provider`, `model`, `duration`, `success`). Originally scoped as an M7 shared dependency,
-   pulled forward into M6 since `ISS-014` needs it and M6 ships first; M7 extends this same log
-   rather than building a second one.
+6. **`ISS-013`** — **done.** `py_mono/skill/telemetry.py` logs `skill`/`provider`/`model`/
+   `duration_ms`/`success` to `telemetry/skill_runs.jsonl` on every `run_skill_safe` call.
+   Originally scoped as an M7 shared dependency, pulled forward into M6 since `ISS-014` needs it
+   and M6 ships first; M7 extends this same log rather than building a second one. See
+   [[ISSUES]] and `specs/011-add-skill-run-telemetry/`.
 7. **`ISS-014`** — model/task fitness check: warn before a heavy generation call if the
    configured model looks like a poor fit for structured output. The clearest "bug we hit →
    feature that prevents the next one" line of anything discussed this session — directly

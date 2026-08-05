@@ -126,3 +126,88 @@ def test_unapproved_skill_is_still_blocked():
 
     with pytest.raises(ApprovalError, match="is not approved for execution"):
         run_skill_safe(registry, "allowed_only", "/skill allowed_only", make_context())
+
+
+# ---------------------------------------------------------------------------
+# ISS-013: run_skill_safe logs one telemetry record per run
+# ---------------------------------------------------------------------------
+
+class FailingSkill(Skill):
+    def name(self) -> str:
+        return "failing_skill"
+
+    def description(self) -> str:
+        return "always raises"
+
+    def run(self, request: str, context: SkillContext) -> str:
+        raise ValueError("boom")
+
+
+def test_successful_run_logs_a_telemetry_record(monkeypatch):
+    skill = UsesAllowedToolSkill()
+    registry = StubRegistry(
+        skill,
+        {"allowed_only": {"status": "approved", "allowed_tools": ["list_files"]}},
+    )
+
+    logged = []
+    monkeypatch.setattr(
+        "py_mono.skill.approval.log_skill_run",
+        lambda skill, provider, model, duration_ms, success: logged.append(
+            (skill, provider, model, success)
+        ),
+    )
+
+    run_skill_safe(registry, "allowed_only", "/skill allowed_only", make_context())
+
+    assert len(logged) == 1
+    assert logged[0][0] == "allowed_only"
+    assert logged[0][3] is True
+
+
+def test_failed_run_still_logs_a_telemetry_record(monkeypatch):
+    skill = FailingSkill()
+    registry = StubRegistry(
+        skill,
+        {"failing_skill": {"status": "approved", "allowed_tools": ["list_files"]}},
+    )
+
+    logged = []
+    monkeypatch.setattr(
+        "py_mono.skill.approval.log_skill_run",
+        lambda skill, provider, model, duration_ms, success: logged.append(
+            (skill, provider, model, success)
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="execution failed"):
+        run_skill_safe(registry, "failing_skill", "/skill failing_skill", make_context())
+
+    assert len(logged) == 1
+    assert logged[0][0] == "failing_skill"
+    assert logged[0][3] is False
+
+
+def test_run_with_no_session_manager_does_not_crash(monkeypatch):
+    """make_context() already uses session_manager=None; this just makes the
+    intent explicit as a regression guard."""
+    skill = UsesAllowedToolSkill()
+    registry = StubRegistry(
+        skill,
+        {"allowed_only": {"status": "approved", "allowed_tools": ["list_files"]}},
+    )
+
+    logged = []
+    monkeypatch.setattr(
+        "py_mono.skill.approval.log_skill_run",
+        lambda skill, provider, model, duration_ms, success: logged.append(
+            (provider, model)
+        ),
+    )
+
+    context = make_context()
+    assert context.session_manager is None
+
+    run_skill_safe(registry, "allowed_only", "/skill allowed_only", context)
+
+    assert logged == [("<unknown>", "<unknown>")]
