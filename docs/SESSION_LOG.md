@@ -443,3 +443,231 @@ and C-03 all now addressed, all three original critical audit findings are resol
 remaining tracked work is `ISS-005`, `ISS-006` (both minor/pre-existing), and `ISS-008`
 (the deferred isolation project).
 still open.
+
+---
+
+## 2026-08-30 -- M7 kickoff and first lifecycle slice specification
+**Issue**: ISS-015 (Add first skill lifecycle graph slice)
+
+**Scope completed**:
+- Confirmed that `docs/ISSUES.md` and `docs/ROADMAP_PLAN.md` superseded stale status docs:
+  M6 is complete and M7 is the next product milestone.
+- Updated `docs/PROJECT_STATUS.md`, `docs/CURRENT_FOCUS.md`, and `docs/NEXT_ACTIONS.md` to
+  reflect M6 completion and M7 kickoff.
+- Updated `docs/ROADMAP_PLAN.md` so M7 no longer reads as not started.
+- Promoted the first M7 slice into `docs/ISSUES.md` as `ISS-015`.
+- Ran Spec Kit specify, plan, and tasks for the first M7 slice:
+  `Critique -> Generate -> Validate -> Test(smoke run) -> Propose`.
+- Created the specification quality checklist and marked it complete after review.
+- Added `plan.md`, `research.md`, `data-model.md`, `contracts/skill-lifecycle-output.md`,
+  `quickstart.md`, and `tasks.md` for implementation handoff.
+
+**Files changed**:
+- `docs/PROJECT_STATUS.md`
+- `docs/CURRENT_FOCUS.md`
+- `docs/NEXT_ACTIONS.md`
+- `docs/ISSUES.md`
+- `docs/ROADMAP_PLAN.md`
+- `.specify/feature.json`
+- `specs/013-skill-lifecycle-smoke-test/spec.md`
+- `specs/013-skill-lifecycle-smoke-test/checklists/requirements.md`
+- `specs/013-skill-lifecycle-smoke-test/plan.md`
+- `specs/013-skill-lifecycle-smoke-test/research.md`
+- `specs/013-skill-lifecycle-smoke-test/data-model.md`
+- `specs/013-skill-lifecycle-smoke-test/contracts/skill-lifecycle-output.md`
+- `specs/013-skill-lifecycle-smoke-test/quickstart.md`
+- `specs/013-skill-lifecycle-smoke-test/tasks.md`
+- `docs/SESSION_LOG.md`
+
+**Design decisions**:
+- Kept `ISS-015` narrow: critique, generation, existing validation, one synthetic smoke run, and
+  proposed-state surfacing only.
+- Left diff-on-regeneration and production failure-driven evolution for later M7 issues.
+- Left `ISS-008` isolated-worker execution gated/deferred and did not mix it into M7's first
+  product slice.
+- Preserved the existing approval hash-ledger boundary as the authority for runnable skills.
+
+**Validation**:
+- Reviewed the new spec against the Spec Kit quality checklist: all checklist items passed.
+- Reviewed the generated plan/tasks against the project constitution; no violations recorded.
+- No production code changed; automated tests were not run.
+
+**Open items**:
+- `ISS-015` is specified, planned, and task-broken-down, but not implemented.
+- `ISS-008` remains open and gated as an M8 prerequisite.
+
+**Next safe action**: Create an implementation branch for `ISS-015` and start `tasks.md` at
+T001.
+
+---
+
+## 2026-08-30 -- Implement ISS-015 and plan next M7 slices
+**Issue**: ISS-015 (Add first skill lifecycle graph slice), plus filing/planning `ISS-016` and
+`ISS-017`
+
+**Scope completed**:
+- Created branch `implement-m7-skill-lifecycle`.
+- Implemented `ISS-015`: `generate_skill` now reports Critique, Generate, Validate, Test, and
+  Propose lifecycle stages.
+- Added pre-approval smoke testing for generated skill code after static validation and before
+  proposal.
+- Preserved the approval boundary: passing lifecycle checks leave the skill proposed and do not
+  write approval ledger entries.
+- Updated the approval ledger hash for the intentionally changed, already-approved
+  `generate_skill` skill.
+- Filed, specified, and planned `ISS-016` as the separate diff-on-regeneration M7 slice.
+- Filed, specified, and planned `ISS-017` as the separate failure-driven evolution M7 slice.
+- Kept lifecycle persistence/reporting and CLI/UX polish out of `ISS-016`/`ISS-017`, per user
+  direction.
+
+**Files changed**:
+- `py_mono/skill/lifecycle.py`
+- `skills/generate_skill/skill.py`
+- `skills/.approvals.json`
+- `tests/test_skill_lifecycle.py`
+- `tests/test_generate_skill.py`
+- `.specify/feature.json`
+- `docs/PROJECT_STATUS.md`
+- `docs/CURRENT_FOCUS.md`
+- `docs/NEXT_ACTIONS.md`
+- `docs/ISSUES.md`
+- `docs/ROADMAP_PLAN.md`
+- `docs/SESSION_LOG.md`
+- `specs/013-skill-lifecycle-smoke-test/*`
+- `specs/014-skill-regeneration-diff/*`
+- `specs/015-failure-driven-skill-evolution/*`
+
+**Design decisions**:
+- Put lifecycle primitives in `py_mono/skill/lifecycle.py`, alongside validation, approval,
+  telemetry, and fitness.
+- Kept `generate_skill` as the user-facing lifecycle orchestrator.
+- Smoke testing imports validated generated code from a temporary file and runs it once with safe
+  tool wrappers; it does not use `SkillRegistry` and does not touch the approval ledger.
+- `ISS-016` and `ISS-017` are planned only, not implemented, and remain separate from
+  persistence/reporting and CLI/UX polish.
+
+**Validation**:
+- `uv run pytest tests/test_skill_lifecycle.py -v` — 6 passed.
+- `uv run pytest tests/test_generate_skill.py -v` — 3 passed.
+- `uv run pytest tests/test_skill_approval.py tests/test_generate_skill.py -v` — 13 passed.
+- `uv run pytest -q` — 145 passed, 1 skipped.
+- `uv run python -m compileall -q py_mono skills` — exit 0. The first sandboxed attempt hit a
+  `uv` cache permission issue; rerun outside the sandbox completed successfully.
+
+**Open items**:
+- `ISS-016` is specified and planned, but not implemented.
+- `ISS-017` is specified and planned, but not implemented.
+- Persistence/reporting polish and CLI/UX polish still need separate issues when ready.
+- `ISS-008` remains gated/deferred as an M8 prerequisite.
+
+**Next safe action**: Review the M7 split and decide whether to implement `ISS-016` next on
+`implement-m7-skill-lifecycle` or split it into its own branch.
+
+---
+
+## 2026-08-30 -- Implement ISS-016 and ISS-017
+**Issue**: `ISS-016` (Show diff when regenerating an existing skill) and `ISS-017` (Propose skill
+revisions from failure context)
+
+**Scope completed**:
+- Implemented `ISS-016`: generation for an existing skill now produces a `.candidate` proposal,
+  renders separate `SKILL.md` and `skill.py` diffs against the approved baseline when available,
+  and reports missing baselines explicitly.
+- Updated `/approve <skill>` to validate and promote `.candidate` proposals through the existing
+  approval flow; invalid candidates are rejected without overwriting the approved skill.
+- Implemented `ISS-017`: `/skill generate_skill --evolve <skill-name>` now reads the latest
+  actionable failed telemetry record, includes that failure context in generation, reuses the
+  lifecycle checks, and saves the output as a candidate proposal.
+- Extended telemetry minimally with optional `request` and `failure_reason` fields populated by
+  `run_skill_safe` on failures.
+- Fixed registry path resolution so hyphenated on-disk skill directories still work with
+  normalized internal skill names and approval-ledger checks.
+- Kept persistence/reporting and CLI/UX polish separate, per user direction.
+
+**Files changed**:
+- `py_mono/skill/diffing.py`
+- `py_mono/skill/evolution.py`
+- `py_mono/skill/telemetry.py`
+- `py_mono/skill/approval.py`
+- `py_mono/skill/base.py`
+- `py_mono/agent/agent.py`
+- `skills/generate_skill/skill.py`
+- `skills/.approvals.json`
+- `tests/test_skill_diffing.py`
+- `tests/test_skill_evolution.py`
+- `tests/test_generate_skill.py`
+- `tests/test_skill_telemetry.py`
+- `tests/test_skill_approval.py`
+- `docs/PROJECT_STATUS.md`
+- `docs/CURRENT_FOCUS.md`
+- `docs/NEXT_ACTIONS.md`
+- `docs/ISSUES.md`
+- `docs/ROADMAP_PLAN.md`
+- `docs/SESSION_LOG.md`
+
+**Design decisions**:
+- Regenerated and evolved outputs are stored under `skills/<name>/.candidate/` so the approved
+  skill remains in place until explicit approval.
+- `/approve` is the only promotion path; it validates candidate code before replacing current
+  files and writing the approval ledger.
+- Failure-driven evolution reuses the `ISS-015` lifecycle and the `ISS-016` candidate/diff path
+  instead of creating a separate self-patching path.
+- Telemetry was extended in the existing JSONL stream rather than adding a second persistence
+  mechanism.
+
+**Validation**:
+- `uv run pytest tests/test_generate_skill.py tests/test_skill_diffing.py tests/test_skill_evolution.py -v`
+  — 19 passed.
+- `uv run pytest tests/test_skill_telemetry.py tests/test_skill_approval.py tests/test_skill_load_gating.py -v`
+  — 26 passed.
+- `uv run pytest -q` — 162 passed, 1 skipped.
+- `uv run python -m compileall -q py_mono skills` — exit 0 after rerun outside the sandbox due
+  the same `uv` cache permission issue seen earlier.
+
+**Open items**:
+- Persistence/reporting polish for lifecycle state still needs a separate issue if wanted.
+- CLI/UX polish for lifecycle output still needs a separate issue if wanted.
+- `ISS-008` remains open and gated as an M8 prerequisite.
+
+**Next safe action**: Review branch `implement-m7-skill-lifecycle`, then commit and merge if
+accepted.
+
+---
+
+## 2026-08-30 -- Record M7 closeout split before merge
+**Issue**: M7 closeout planning (`ISS-018`, `ISS-019`) plus branch handoff for M7 core work
+
+**Scope completed**:
+- Filed `ISS-018` as the M7 closeout issue for persisting and reporting skill lifecycle state.
+- Filed `ISS-019` as the M7 closeout issue for CLI/UX polish around lifecycle review.
+- Recorded the intended order: `ISS-018` first, `ISS-019` second, revisit `ISS-008`, then start
+  M8.
+- Updated status, focus, roadmap, and next-action docs to reflect that `ISS-015`, `ISS-016`, and
+  `ISS-017` are M7 core complete while `ISS-018` and `ISS-019` remain open closeout work.
+
+**Files changed**:
+- `docs/ISSUES.md`
+- `docs/PROJECT_STATUS.md`
+- `docs/CURRENT_FOCUS.md`
+- `docs/NEXT_ACTIONS.md`
+- `docs/ROADMAP_PLAN.md`
+- `docs/SESSION_LOG.md`
+
+**Design decisions**:
+- Kept lifecycle persistence/reporting separate from CLI polish because the CLI needs stable
+  persisted state to display.
+- Kept both items before M8 so provenance/sharing work does not start on top of unclear lifecycle
+  review state.
+- Left `ISS-008` as the explicit M8 prerequisite to revisit after M7 closeout.
+
+**Validation**:
+- Pending in this entry; run `git diff --check` and the existing test/compile validation before
+  committing the branch.
+
+**Open items**:
+- `ISS-018` is filed but not specified, planned, or implemented.
+- `ISS-019` is filed but not specified, planned, or implemented.
+- `ISS-008` remains open and gated as an M8 prerequisite.
+
+**Next safe action**: Commit and merge `implement-m7-skill-lifecycle`; next feature work should
+start with Spec Kit for `ISS-018`.

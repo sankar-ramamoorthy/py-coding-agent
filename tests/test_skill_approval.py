@@ -153,8 +153,8 @@ def test_successful_run_logs_a_telemetry_record(monkeypatch):
     logged = []
     monkeypatch.setattr(
         "py_mono.skill.approval.log_skill_run",
-        lambda skill, provider, model, duration_ms, success: logged.append(
-            (skill, provider, model, success)
+        lambda skill, provider, model, duration_ms, success, **kwargs: logged.append(
+            (skill, provider, model, success, kwargs)
         ),
     )
 
@@ -163,6 +163,8 @@ def test_successful_run_logs_a_telemetry_record(monkeypatch):
     assert len(logged) == 1
     assert logged[0][0] == "allowed_only"
     assert logged[0][3] is True
+    assert logged[0][4]["request"] == "/skill allowed_only"
+    assert logged[0][4]["failure_reason"] == ""
 
 
 def test_failed_run_still_logs_a_telemetry_record(monkeypatch):
@@ -175,8 +177,8 @@ def test_failed_run_still_logs_a_telemetry_record(monkeypatch):
     logged = []
     monkeypatch.setattr(
         "py_mono.skill.approval.log_skill_run",
-        lambda skill, provider, model, duration_ms, success: logged.append(
-            (skill, provider, model, success)
+        lambda skill, provider, model, duration_ms, success, **kwargs: logged.append(
+            (skill, provider, model, success, kwargs)
         ),
     )
 
@@ -186,6 +188,8 @@ def test_failed_run_still_logs_a_telemetry_record(monkeypatch):
     assert len(logged) == 1
     assert logged[0][0] == "failing_skill"
     assert logged[0][3] is False
+    assert logged[0][4]["request"] == "/skill failing_skill"
+    assert logged[0][4]["failure_reason"] == "boom"
 
 
 def test_run_with_no_session_manager_does_not_crash(monkeypatch):
@@ -200,7 +204,7 @@ def test_run_with_no_session_manager_does_not_crash(monkeypatch):
     logged = []
     monkeypatch.setattr(
         "py_mono.skill.approval.log_skill_run",
-        lambda skill, provider, model, duration_ms, success: logged.append(
+        lambda skill, provider, model, duration_ms, success, **kwargs: logged.append(
             (provider, model)
         ),
     )

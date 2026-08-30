@@ -1,28 +1,44 @@
 # skills/generate_skill/skill.py
 """
-generate_skill — LLM-powered skill generator.
+generate_skill - LLM-powered skill generator.
 
-Generates a complete, working skill (SKILL.md + skill.py) from a
-name and description using two LLM calls:
+Generates a complete skill (SKILL.md + skill.py) from a name and description
+using two LLM calls:
 
   Call 1: Generate SKILL.md
   Call 2: Generate skill.py (with retry on validation failure)
 
-Validation is applied before saving. See ADR-011 and ADR-013.
-
-Usage:
-    /skill generate_skill <skill-name> | <description>
-
-Example:
-    /skill generate_skill list-python-files | List all Python files in workspace
+Validation and one pre-approval smoke test run before saving the skill as
+proposed. See ADR-011, ADR-013, and ISS-015.
 """
 
-import json, re
-import logging,time
+import logging
+import re
+import time
 from pathlib import Path
 from typing import Optional
 
-from py_mono.skill.base import Skill, SkillContext, SKILLS_DIR
+from py_mono.skill.base import SKILLS_DIR, Skill, SkillContext
+from py_mono.skill.diffing import (
+    build_artifact_diff,
+    load_approved_baseline,
+    render_diff_report,
+    write_candidate,
+)
+from py_mono.skill.evolution import latest_failure_context
+from py_mono.skill.lifecycle import (
+    STATUS_FAILED,
+    STATUS_PASSED,
+    STATUS_SKIPPED,
+    STAGE_CRITIQUE,
+    STAGE_GENERATE,
+    STAGE_PROPOSE,
+    STAGE_TEST,
+    STAGE_VALIDATE,
+    SkillLifecycleRun,
+    parse_allowed_tools,
+    smoke_test_generated_skill,
+)
 from py_mono.skill.prompts import build_skill_md_prompt, build_skill_py_prompt
 from py_mono.skill.validator import validate_skill_md, validate_skill_py
 
@@ -32,7 +48,6 @@ MAX_RETRIES = 1  # one retry on skill.py validation failure
 
 
 class GenerateSkill(Skill):
-
     def name(self) -> str:
         return "generate_skill"
 
@@ -40,40 +55,38 @@ class GenerateSkill(Skill):
         return "Generate a new skill (SKILL.md + skill.py) using the LLM"
 
     def run(self, request: str, context: SkillContext) -> str:
-        """
-        Parse request, call LLM twice, validate, save.
-
-        Args:
-            request : full command e.g. '/skill generate_skill list-python-files | description'
-            context : SkillContext with session_manager and agent_tools
-
-        Returns:
-            str: human-readable result
-        """
-        # ------------------------------------------------------------------
-        # Step 1 — Parse input
-        # ------------------------------------------------------------------
         parsed = self._parse_request(request)
         if isinstance(parsed, str):
-            return parsed  # error message
+            return parsed
 
-        skill_name, description = parsed
-
-        # Check skill doesn't already exist
+        skill_name, description, mode, failure_context = parsed
         skill_path = SKILLS_DIR / skill_name
-        if skill_path.exists():
+        is_existing_skill = (skill_path / "SKILL.md").exists() or (skill_path / "skill.py").exists()
+        if mode == "create" and is_existing_skill:
+            mode = "regenerate"
+        if mode == "evolve" and failure_context is None:
+            failure_context = latest_failure_context(skill_name)
+            if failure_context is None:
+                return (
+                    f"No usable failure context is available for skill '{skill_name}'.\n"
+                    "Run the skill again to capture a failure before requesting evolution."
+                )
+            description = (
+                f"Revise the existing skill using this failure context.\n\n"
+                f"{failure_context.to_prompt_text()}"
+            )
+        if mode == "create" and is_existing_skill:
             return (
-                f"❌ Skill '{skill_name}' already exists at {skill_path}.\n"
+                f"ERROR: Skill '{skill_name}' already exists at {skill_path}.\n"
                 f"Use /skill help {skill_name} to inspect it."
             )
+        if mode in ("regenerate", "evolve") and not is_existing_skill:
+            return f"ERROR: Skill '{skill_name}' does not exist, so it cannot be {mode}d."
 
-        # Build tool map for prompts
+        lifecycle = SkillLifecycleRun(skill_name)
         available_tools = self._build_tool_descriptions(context)
 
-        # ------------------------------------------------------------------
-        # Step 2 — LLM Call 1: Generate SKILL.md
-        # ------------------------------------------------------------------
-        print(f"🤖 Generating SKILL.md for '{skill_name}'...")
+        print(f"Generating SKILL.md for '{skill_name}'...")
         skill_md_content = self._call_llm(
             context=context,
             prompt=build_skill_md_prompt(
@@ -83,20 +96,34 @@ class GenerateSkill(Skill):
             ),
         )
         if skill_md_content is None:
-            return "❌ LLM call failed while generating SKILL.md. Try again."
+            lifecycle.add(
+                STAGE_GENERATE,
+                STATUS_FAILED,
+                "LLM call failed while generating SKILL.md.",
+            )
+            lifecycle.add(STAGE_VALIDATE, STATUS_SKIPPED, "Generation failed.")
+            lifecycle.add(STAGE_TEST, STATUS_SKIPPED, "Generation failed.")
+            lifecycle.add(STAGE_PROPOSE, STATUS_SKIPPED, "Generation failed.")
+            return self._build_failed_lifecycle_response(
+                skill_name=skill_name,
+                lifecycle=lifecycle,
+                next_step="Try again.",
+            )
 
-        # Validate and auto-fix SKILL.md
         md_result = validate_skill_md(
             content=skill_md_content,
             skill_name=skill_name,
             known_tools=list(available_tools.keys()),
         )
         skill_md_content = md_result.fixed_content or skill_md_content
+        lifecycle.add(
+            STAGE_CRITIQUE,
+            STATUS_PASSED,
+            "Skill specification accepted.",
+            md_result.warnings,
+        )
 
-        # ------------------------------------------------------------------
-        # Step 3 — LLM Call 2: Generate skill.py (with one retry)
-        # ------------------------------------------------------------------
-        print(f"🤖 Generating skill.py for '{skill_name}'...")
+        print(f"Generating skill.py for '{skill_name}'...")
         skill_py_content, py_result, warnings = self._generate_skill_py(
             context=context,
             skill_name=skill_name,
@@ -104,58 +131,125 @@ class GenerateSkill(Skill):
             skill_md_content=skill_md_content,
             available_tools=available_tools,
         )
+        lifecycle.add(STAGE_GENERATE, STATUS_PASSED, "Generated SKILL.md and skill.py.")
 
-        # Hard fail — forbidden patterns survived retry
-        if skill_py_content is None  or  py_result.structure_errors or py_result.has_syntax_errors():
-            return (
-                f"❌ Skill '{skill_name}' could NOT be saved.\n"
-                f"After {MAX_RETRIES + 1} attempts, generated code still has forbidden patterns:\n"
-                f"{py_result.failure_reason()}\n\n"
-                f"Try rephrasing your description or switch to a more capable model:\n"
-                f"  /provider litellm groq/qwen/qwen3-32b"
+        if skill_py_content is None or not py_result.valid:
+            failure_reason = py_result.failure_reason()
+            lifecycle.add(
+                STAGE_VALIDATE,
+                STATUS_FAILED,
+                "Generated skill.py failed validation.",
+                failure_reason.splitlines(),
+            )
+            lifecycle.add(STAGE_TEST, STATUS_SKIPPED, "Validation failed.")
+            lifecycle.add(STAGE_PROPOSE, STATUS_SKIPPED, "Validation failed.")
+            return self._build_failed_lifecycle_response(
+                skill_name=skill_name,
+                lifecycle=lifecycle,
+                next_step=(
+                    "Try rephrasing your description or switch to a more capable model:\n"
+                    "  /provider litellm groq/qwen/qwen3-32b"
+                ),
             )
 
-        # ------------------------------------------------------------------
-        # Step 4 — Save files
-        # ------------------------------------------------------------------
-        try:
-            #skill_path.mkdir(parents=True, exist_ok=False)
-            (skill_path / "SKILL.md").write_text(skill_md_content, encoding="utf-8")
-            (skill_path / "skill.py").write_text(skill_py_content, encoding="utf-8")
-        except Exception as e:
-            return f"❌ Failed to save skill files: {e}"
+        lifecycle.add(STAGE_VALIDATE, STATUS_PASSED, "Generated skill.py passed validation.")
 
-        # ------------------------------------------------------------------
-        # Step 5 — Build response
-        # ------------------------------------------------------------------
+        smoke_result = smoke_test_generated_skill(
+            skill_name=skill_name,
+            code=skill_py_content,
+            context=context,
+            allowed_tools=parse_allowed_tools(skill_md_content, available_tools.keys()),
+        )
+        if not smoke_result.passed:
+            lifecycle.add(
+                STAGE_TEST,
+                STATUS_FAILED,
+                "Smoke test failed.",
+                [smoke_result.failure_reason],
+            )
+            lifecycle.add(STAGE_PROPOSE, STATUS_SKIPPED, "Smoke test failed.")
+            return self._build_failed_lifecycle_response(
+                skill_name=skill_name,
+                lifecycle=lifecycle,
+                next_step="Retry generation after adjusting the skill description.",
+            )
+
+        smoke_details = []
+        if smoke_result.output_preview:
+            smoke_details.append(f"Output preview: {smoke_result.output_preview}")
+        lifecycle.add(STAGE_TEST, STATUS_PASSED, "Smoke test passed.", smoke_details)
+
+        try:
+            skill_path.mkdir(parents=True, exist_ok=True)
+            if mode == "create":
+                write_path = skill_path
+                (skill_path / "SKILL.md").write_text(skill_md_content, encoding="utf-8")
+                (skill_path / "skill.py").write_text(skill_py_content, encoding="utf-8")
+            else:
+                write_path = write_candidate(skill_path, skill_md_content, skill_py_content)
+        except Exception as e:
+            lifecycle.add(STAGE_PROPOSE, STATUS_FAILED, f"Failed to save skill files: {e}")
+            return self._build_failed_lifecycle_response(
+                skill_name=skill_name,
+                lifecycle=lifecycle,
+                next_step="Check filesystem permissions and try again.",
+            )
+
+        lifecycle.add(STAGE_PROPOSE, STATUS_PASSED, "Skill saved as proposed.")
+        diff_report = ""
+        if mode in ("regenerate", "evolve"):
+            baseline = load_approved_baseline(SKILLS_DIR, skill_name)
+            diffs = [
+                build_artifact_diff(
+                    "SKILL.md",
+                    baseline.skill_md_content,
+                    skill_md_content,
+                    baseline.available,
+                    baseline.reason,
+                ),
+                build_artifact_diff(
+                    "skill.py",
+                    baseline.skill_py_content,
+                    skill_py_content,
+                    baseline.available,
+                    baseline.reason,
+                ),
+            ]
+            diff_report = render_diff_report(diffs)
         return self._build_response(
             skill_name=skill_name,
-            skill_path=skill_path,
+            skill_path=write_path,
             skill_py_content=skill_py_content,
             md_warnings=md_result.warnings,
             py_warnings=warnings,
-            py_result=py_result,
+            lifecycle=lifecycle,
+            mode=mode,
+            diff_report=diff_report,
+            failure_context=failure_context.to_prompt_text() if failure_context else "",
         )
 
-    # -----------------------------------------------------------------------
-    # Private helpers
-    # -----------------------------------------------------------------------
-
     def _parse_request(self, request: str):
-        """
-        Parse '/skill generate_skill <name> | <description>'.
-        Returns (skill_name, description) tuple or error string.
-        """
-        # Strip command prefix
         prefix = "/skill generate_skill"
         raw = request.strip()
         if raw.startswith(prefix):
             raw = raw[len(prefix):].strip()
 
+        if raw.startswith("--evolve "):
+            skill_name = raw[len("--evolve "):].strip().lower().replace(" ", "-")
+            if not skill_name:
+                return "ERROR: Skill name cannot be empty."
+            if not re.match(r"^[a-z0-9][a-z0-9\-]*$", skill_name):
+                return (
+                    f"ERROR: Invalid skill name '{skill_name}'. "
+                    "Use lowercase letters, numbers, and hyphens only."
+                )
+            return skill_name, "", "evolve", None
+
         parts = raw.split("|", 1)
         if len(parts) != 2:
             return (
                 "Usage: /skill generate_skill <skill-name> | <description>\n"
+                "       /skill generate_skill --evolve <skill-name>\n"
                 "Example: /skill generate_skill list-python-files | "
                 "List all Python files in the workspace with sizes"
             )
@@ -164,69 +258,33 @@ class GenerateSkill(Skill):
         description = parts[1].strip()
 
         if not skill_name:
-            return "❌ Skill name cannot be empty."
+            return "ERROR: Skill name cannot be empty."
         if not description:
-            return "❌ Description cannot be empty."
+            return "ERROR: Description cannot be empty."
 
-        # Validate skill name format
-        import re
-        if not re.match(r'^[a-z0-9][a-z0-9\-]*$', skill_name):
+        if not re.match(r"^[a-z0-9][a-z0-9\-]*$", skill_name):
             return (
-                f"❌ Invalid skill name '{skill_name}'. "
+                f"ERROR: Invalid skill name '{skill_name}'. "
                 "Use lowercase letters, numbers, and hyphens only."
             )
 
-        return skill_name, description
+        return skill_name, description, "create", None
 
     def _build_tool_descriptions(self, context: SkillContext) -> dict:
-        """Build a dict of tool_name → description from context.agent_tools."""
         result = {}
         for name, tool in context.agent_tools.items():
             desc = getattr(tool, "description", "No description available")
             result[name] = desc
         return result
 
-    def _call_llm_deprecated(self, context: SkillContext, prompt: str) -> Optional[str]:
-        """
-        Make a single LLM call via session_manager.
-        Returns the text response or None on failure.
-        """
-        try:
-            provider = context.session_manager.get_active_provider()
-            messages = [
-                {"role": "user", "content": prompt}
-            ]
-            response = provider.generate(messages=messages, tools=None)
-            text = response.get("text", "")
-            if not text or not text.strip():
-                logger.error("LLM returned empty response")
-                return None
-            return text.strip()
-        except Exception as e:
-            logger.error(f"LLM call failed: {e}")
-            return None
-
     def _strip_thinking(self, text: str) -> str:
-        """
-        Remove <thinking>...</thinking> blocks from LLM output.
-        Remove <think>...</think> blocks from LLM output.
-        Handles multiline and nested cases conservatively.
-        """
-        # Remove full blocks
         text = re.sub(r"<thinking>.*?</thinking>", "", text, flags=re.DOTALL)
-
-        # Remove stray opening/closing tags if model is sloppy
-        #text = text.replace("<thinking>", "").replace("</thinking>", "")
-        # Remove full blocks
         text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-
-        # Remove stray opening/closing tags if model is sloppy
-        #text = text.replace("<think>", "").replace("</think>", "")
-
         return text.strip()
 
     def _call_llm(self, context: SkillContext, prompt: str) -> Optional[str]:
-        from py_mono.skill.validator import _strip_markdown_fences        
+        from py_mono.skill.validator import _strip_markdown_fences
+
         try:
             provider = context.session_manager.get_active_provider()
             messages = [{"role": "user", "content": prompt}]
@@ -237,21 +295,14 @@ class GenerateSkill(Skill):
                 logger.error("LLM returned empty response")
                 return None
 
-            text = text.strip()
-            logger.info("LLM returned empty response")
-
-            # 🔥 Strip <thinking> tags immediately
-            text = self._strip_thinking(text)
-            text = _strip_markdown_fences(text)            
-            logger.info(f"in _call_llm text stripped think and markdown{text}")
-            #print(text)
-
+            text = self._strip_thinking(text.strip())
+            text = _strip_markdown_fences(text)
+            logger.debug("LLM response normalized for generated skill output")
             return text
-
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
             return None
-    
+
     def _generate_skill_py(
         self,
         context: SkillContext,
@@ -260,29 +311,18 @@ class GenerateSkill(Skill):
         skill_md_content: str,
         available_tools: dict,
     ):
-        """
-        Generate and validate skill.py with one retry on failure.
-
-        Returns:
-            (code, result, warnings) where:
-                code     = valid code string, or None on hard fail
-                result   = SkillPyValidationResult
-                warnings = list of non-fatal warning strings
-        """
         from py_mono.skill.validator import SkillPyValidationResult
 
         retry_reason = ""
         warnings = []
-        code=""
-        prev_code=""
-
+        code = ""
+        prev_code = ""
 
         for attempt in range(MAX_RETRIES + 1):
             if attempt > 0:
-                print(f"🔄 Retrying skill.py generation (attempt {attempt + 1})...")
-            
-            prev_code=code    
+                print(f"Retrying skill.py generation (attempt {attempt + 1})...")
 
+            prev_code = code
             code = self._call_llm(
                 context=context,
                 prompt=build_skill_py_prompt(
@@ -295,55 +335,34 @@ class GenerateSkill(Skill):
                 ),
             )
 
-            # ALWAYS persist raw LLM output for debugging
-            debug_dir = (SKILLS_DIR / skill_name)
+            debug_dir = SKILLS_DIR / skill_name
             debug_dir.mkdir(parents=True, exist_ok=True)
-
-            timestamp = int(time.time())
-            debug_path = debug_dir / f"skill_debug_{timestamp}.txt"
-
+            debug_path = debug_dir / f"skill_debug_{int(time.time())}.txt"
             if code:
                 debug_path.write_text(code, encoding="utf-8")
             else:
                 debug_path.write_text("[EMPTY RESPONSE FROM LLM]", encoding="utf-8")
-
             logger.debug(f"Saved debug LLM output to {debug_path}")
-
 
             if code is None:
                 return None, SkillPyValidationResult(
                     valid=False,
-                    syntax_errors=["LLM returned empty response"]
+                    syntax_errors=["LLM returned empty response"],
                 ), warnings
 
-            logger.debug(f"LLM returned code (length={len(code)})")
-
-            if code is not None:
-                code = self._normalize_code(code) 
-                timestamp = int(time.time())
-                debug_path = debug_dir / f"skill_debug_{timestamp}.txt"
-            
-
+            code = self._normalize_code(code)
             result = validate_skill_py(code=code, skill_name=skill_name)
             if result.valid:
-                code = self._normalize_code(code)
                 return code, result, warnings
 
-            # Forbidden patterns — retry if first attempt, hard fail if retry
-            if result.has_forbidden():
-                if attempt < MAX_RETRIES:
-                    retry_reason = result.failure_reason()
-                    continue
-                else:
-                    # Hard fail after retry
-                    return code, result, warnings
+            if result.has_forbidden() and attempt < MAX_RETRIES:
+                retry_reason = result.failure_reason()
+                continue
 
-            # Non-forbidden failures (syntax, structure) — save with warning
             if result.has_syntax_errors() and attempt < MAX_RETRIES:
                 retry_reason = result.failure_reason()
                 continue
 
-            # After retry or non-critical failures — save with warnings
             warnings.extend(result.syntax_errors)
             warnings.extend(result.structure_errors)
 
@@ -351,18 +370,18 @@ class GenerateSkill(Skill):
                 if attempt < MAX_RETRIES:
                     retry_reason = result.failure_reason()
                     continue
-                else:
-                    return code, result, warnings
-    
-        # Should not reach here
+                return code, result, warnings
+
+            return code, result, warnings
+
         return None, SkillPyValidationResult(valid=False), warnings
+
     def _normalize_code(self, code: str) -> str:
         from py_mono.skill.validator import _strip_markdown_fences
-        
+
         code = self._strip_thinking(code)
         code = _strip_markdown_fences(code)
         return code.strip()
-    
 
     def _build_response(
         self,
@@ -371,33 +390,63 @@ class GenerateSkill(Skill):
         skill_py_content: str,
         md_warnings: list,
         py_warnings: list,
-        py_result,
+        lifecycle: SkillLifecycleRun,
+        mode: str = "create",
+        diff_report: str = "",
+        failure_context: str = "",
     ) -> str:
-        """Build the final user-facing response message."""
         lines = []
 
         all_warnings = md_warnings + py_warnings
         if all_warnings:
-            lines.append(f"⚠️  Skill '{skill_name}' saved with warnings:")
-            for w in all_warnings:
-                lines.append(f"   - {w}")
+            lines.append(f"WARNING: Skill '{skill_name}' saved with warnings:")
+            for warning in all_warnings:
+                lines.append(f"   - {warning}")
             lines.append("")
         else:
-            lines.append(f"✅ Skill '{skill_name}' generated successfully.")
+            lines.append(f"Skill '{skill_name}' generated successfully.")
             lines.append("")
 
-        lines.append(f"Status: proposed — not yet executable.")
+        lines.append(lifecycle.render())
+        lines.append("")
+        if failure_context:
+            lines.append("Failure context:")
+            lines.append(failure_context)
+            lines.append("")
+        if diff_report:
+            lines.append(diff_report)
+            lines.append("")
+        lines.append("Status: proposed - not yet executable.")
         lines.append(f"Location: {skill_path}")
         lines.append("")
         lines.append("Next steps:")
-        lines.append(f"  1. Review:  /skill help {skill_name}")
+        if mode == "create":
+            lines.append(f"  1. Review:  /skill help {skill_name}")
+        else:
+            lines.append(f"  1. Review:  {skill_path}")
         lines.append(f"  2. Approve: /approve {skill_name}")
         lines.append(f"  3. Run:     /skill {skill_name}")
         lines.append("")
 
-        # Preview first 8 lines of skill.py
         preview_lines = skill_py_content.splitlines()[:8]
         lines.append("Preview of generated skill.py:")
         lines.append("  " + "\n  ".join(preview_lines))
 
         return "\n".join(lines)
+
+    def _build_failed_lifecycle_response(
+        self,
+        skill_name: str,
+        lifecycle: SkillLifecycleRun,
+        next_step: str,
+    ) -> str:
+        return "\n".join(
+            [
+                f"Skill '{skill_name}' could NOT be proposed.",
+                "",
+                lifecycle.render(),
+                "",
+                "Next step:",
+                f"  {next_step}",
+            ]
+        )

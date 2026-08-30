@@ -3,7 +3,7 @@ title: Issues Register
 type: index
 status: canonical
 created: 2026-08-03
-updated: 2026-08-05
+updated: 2026-08-30
 ---
 
 # Issues Register
@@ -47,6 +47,8 @@ issue's own section below the index, not in the index table — keeps the table 
 | ID | Status | Milestone | Title | Branch |
 | --- | --- | --- | --- | --- |
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
+| ISS-018 | open | M7 closeout | Persist and report skill lifecycle state | — |
+| ISS-019 | open | M7 closeout | Polish CLI UX for lifecycle review | — |
 
 ## Closed Index
 
@@ -65,6 +67,9 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-012 | done | M6 | Add minimal CI (`pytest` + `compileall` on every PR) | add-minimal-ci |
 | ISS-013 | done | M6 | Add lightweight per-run telemetry log | add-skill-run-telemetry |
 | ISS-014 | done | M6 | Add model/task fitness check | add-model-task-fitness-check |
+| ISS-015 | done | M7 | Add first skill lifecycle graph slice | implement-m7-skill-lifecycle |
+| ISS-016 | done | M7 | Show diff when regenerating an existing skill | implement-m7-skill-lifecycle |
+| ISS-017 | done | M7 | Propose skill revisions from failure context | implement-m7-skill-lifecycle |
 
 ---
 
@@ -82,9 +87,82 @@ issue's own section below the index, not in the index table — keeps the table 
 - **Status:** tracked for future consideration, not started — also a prerequisite for
   Milestone 8 (`docs/ROADMAP_PLAN.md`), not just "eventually"
 
+### ISS-018 — Persist and report skill lifecycle state
+- **Milestone:** M7 closeout
+- **Source:** 2026-08-30 user-directed M7 closeout split after completion of `ISS-015`,
+  `ISS-016`, and `ISS-017`
+- **What:** add durable, inspectable lifecycle state for generated and regenerated skill
+  candidates.
+- **Scope:** lightweight persistence for candidate/lifecycle metadata, lifecycle reports,
+  baseline references, rendered diff records, smoke-test results, and failure-context records.
+  Keep this to file-backed state and reports; no dashboard unless explicitly requested.
+- **Order:** do before `ISS-019`, because CLI polish needs stable state to display.
+- **Status:** open, not started.
+
+### ISS-019 — Polish CLI UX for lifecycle review
+- **Milestone:** M7 closeout
+- **Source:** 2026-08-30 user-directed M7 closeout split after completion of `ISS-015`,
+  `ISS-016`, and `ISS-017`
+- **What:** make the human review path for lifecycle proposals clear and predictable.
+- **Scope:** improve `/skill help`, `/skill list`, generation output, candidate review, diff
+  display, and `/approve` messaging around lifecycle proposals and candidates.
+- **Order:** do after `ISS-018`, then revisit `ISS-008`, then proceed to M8.
+- **Status:** open, not started.
+
 ---
 
 ## Closed — Detail
+
+### ISS-017 — Propose skill revisions from failure context
+- **Milestone:** M7
+- **Source:** 2026-08-30 M7 scope split; user directed persistence/reporting and CLI/UX to remain
+  separate issues
+- **Fix:** added `py_mono/skill/evolution.py` to find the latest actionable failed run for a
+  skill from the existing telemetry stream. Extended telemetry records with optional `request`
+  and `failure_reason` fields, and updated `run_skill_safe` to populate them for failures.
+- **Generator behavior:** `/skill generate_skill --evolve <skill-name>` now uses captured
+  failure context as generation input, then routes the proposed revision through the `ISS-015`
+  lifecycle and the `ISS-016` candidate/diff path.
+- **Approval boundary:** failure-driven revisions are written as `.candidate` proposals and never
+  self-approve, ledger-record, or load for normal execution.
+- **Tests:** added `tests/test_skill_evolution.py` and evolution coverage in
+  `tests/test_generate_skill.py`. Validation: `uv run pytest -q` -> 162 passed, 1 skipped;
+  `uv run python -m compileall -q py_mono skills` -> exit 0.
+
+### ISS-016 — Show diff when regenerating an existing skill
+- **Milestone:** M7
+- **Source:** 2026-08-30 M7 scope split; user directed persistence/reporting and CLI/UX to remain
+  separate issues
+- **Fix:** added `py_mono/skill/diffing.py` for approved-baseline lookup, artifact diff rendering,
+  `.candidate` storage, and candidate promotion. `generate_skill` now treats generation for an
+  existing skill as regeneration, runs the `ISS-015` lifecycle, writes proposed artifacts under
+  `skills/<name>/.candidate/`, and renders separate diffs for `SKILL.md` and `skill.py`.
+- **Approval behavior:** `/approve <skill>` validates a candidate before promotion, preserves the
+  original approved skill if candidate validation fails, then promotes and approves the candidate
+  through the existing validation and approval-ledger path.
+- **Compatibility:** `SkillRegistry` path resolution now supports hyphenated on-disk skill
+  directories while preserving normalized internal names.
+- **Tests:** added `tests/test_skill_diffing.py` and regeneration/candidate approval coverage in
+  `tests/test_generate_skill.py`. Validation: `uv run pytest -q` -> 162 passed, 1 skipped;
+  `uv run python -m compileall -q py_mono skills` -> exit 0.
+
+### ISS-015 — Add first skill lifecycle graph slice
+- **Milestone:** M7
+- **Source:** 2026-08-30 M7 kickoff from `docs/ROADMAP_PLAN.md`
+- **Fix:** added `py_mono/skill/lifecycle.py` with lifecycle stage result models, allowed-tool
+  parsing for generated skill specs, and a pre-approval smoke-test helper that imports validated
+  generated code from a temporary file and runs it once with safe tool wrappers.
+- **Generator behavior:** updated `skills/generate_skill/skill.py` so successful generation
+  reports Critique, Generate, Validate, Test, and Propose stages before review. Static validation
+  failures stop before Test; smoke-test failures stop before Propose; passing candidates are saved
+  with `status: proposed` and still require `/approve`.
+- **Approval boundary:** no approval ledger entry is written by lifecycle success. The existing
+  approval hash ledger remains the authority for normal execution. The ledger hash for the
+  already-approved `generate_skill` skill was updated to match this intentional implementation
+  change.
+- **Tests:** added `tests/test_skill_lifecycle.py` and `tests/test_generate_skill.py`.
+  Validation: `uv run pytest -q` -> 145 passed, 1 skipped; `uv run python -m compileall -q
+  py_mono skills` -> exit 0.
 
 ### ISS-001 — App fails to import/start (syntax errors)
 - **Milestone:** M5

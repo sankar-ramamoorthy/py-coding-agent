@@ -156,6 +156,7 @@ def run_skill_safe(
 
     start = time.monotonic()
     success = False
+    failure_reason = ""
     try:
         result = skill.run(request, safe_context)
         success = True
@@ -163,9 +164,18 @@ def run_skill_safe(
             return f"{fitness_warning}\n\n{result}"
         return result
     except Exception as e:
+        failure_reason = str(e)
         raise RuntimeError(
             f"Skill '{skill_name}' execution failed: {str(e)}"
         ) from e
     finally:
         duration_ms = (time.monotonic() - start) * 1000
-        log_skill_run(skill_name, provider_name, model_name, duration_ms, success)
+        log_skill_run(
+            skill_name,
+            provider_name,
+            model_name,
+            duration_ms,
+            success,
+            request=request,
+            failure_reason=failure_reason,
+        )

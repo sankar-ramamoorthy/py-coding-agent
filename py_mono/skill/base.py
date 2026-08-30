@@ -178,6 +178,7 @@ class SkillRegistry:
             meta = self._parse_skill_md(skill_md)
             raw_name = meta.get("name", skill_dir.name)
             name = self._norm(raw_name)
+            ledger_names = (name, str(raw_name), skill_dir.name)
             meta["name"] = name
             self._metadata[name] = meta
             self._has_code[name] = skill_py.exists()
@@ -185,7 +186,7 @@ class SkillRegistry:
             if skill_py.exists():
                 status = str(meta.get("status", "proposed")).lower()
 
-                if status == "approved" and name not in ledger:
+                if status == "approved" and not any(ledger_name in ledger for ledger_name in ledger_names):
                     # Pre-existing approved skill, ledger doesn't know it yet —
                     # recognize its current state once, visibly marked as a
                     # seed event rather than a real review.
@@ -196,7 +197,10 @@ class SkillRegistry:
                         f"(pre-existing approved skill, not a review)"
                     )
 
-                if status == "approved" and approval_ledger.is_approved(ledger, name, skill_py):
+                if status == "approved" and any(
+                    approval_ledger.is_approved(ledger, ledger_name, skill_py)
+                    for ledger_name in ledger_names
+                ):
                     skill = self._load_skill_py(skill_py, name)
                     if skill:
                         self._skills[name] = skill
@@ -214,7 +218,7 @@ class SkillRegistry:
 
     def reload_skill(self, skill_name: str) -> bool:
         name = self._norm(skill_name)
-        skill_dir = self.skills_dir / name
+        skill_dir = self._skill_dir_for(skill_name)
         skill_md = skill_dir / "SKILL.md"
         skill_py = skill_dir / "skill.py"
 
@@ -223,6 +227,8 @@ class SkillRegistry:
             return False
 
         meta = self._parse_skill_md(skill_md)
+        raw_name = meta.get("name", skill_dir.name)
+        ledger_names = (name, str(raw_name), skill_dir.name)
         meta["name"] = name
         self._metadata[name] = meta
         self._has_code[name] = skill_py.exists()
@@ -232,7 +238,7 @@ class SkillRegistry:
             ledger = approval_ledger.load_ledger(ledger_path)
             status = str(meta.get("status", "proposed")).lower()
 
-            if status == "approved" and name not in ledger:
+            if status == "approved" and not any(ledger_name in ledger for ledger_name in ledger_names):
                 approval_ledger.record_approval(ledger, name, skill_py, seeded=True)
                 approval_ledger.save_ledger(ledger, ledger_path)
                 logger.info(
@@ -240,7 +246,10 @@ class SkillRegistry:
                     f"(pre-existing approved skill, not a review)"
                 )
 
-            if status == "approved" and approval_ledger.is_approved(ledger, name, skill_py):
+            if status == "approved" and any(
+                approval_ledger.is_approved(ledger, ledger_name, skill_py)
+                for ledger_name in ledger_names
+            ):
                 skill = self._load_skill_py(skill_py, name)
                 if skill:
                     self._skills[name] = skill
@@ -294,8 +303,7 @@ class SkillRegistry:
         return results
 
     def get_skill_md(self, name: str) -> Optional[str]:
-        name = self._norm(name)
-        skill_dir = self.skills_dir / name
+        skill_dir = self._skill_dir_for(name)
         skill_md = skill_dir / "SKILL.md"
         if skill_md.exists():
             return skill_md.read_text(encoding="utf-8")
@@ -304,6 +312,12 @@ class SkillRegistry:
     # -------------------------
     # Helpers
     # -------------------------
+    def _skill_dir_for(self, skill_name: str) -> Path:
+        raw_dir = self.skills_dir / skill_name
+        if raw_dir.exists():
+            return raw_dir
+        return self.skills_dir / self._norm(skill_name)
+
     def _parse_skill_md(self, skill_md: Path) -> dict:
         try:
             text = skill_md.read_text(encoding="utf-8")
