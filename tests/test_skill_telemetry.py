@@ -21,7 +21,29 @@ def test_log_skill_run_writes_one_json_line(tmp_path):
     assert record["model"] == "qwen3.5:4b"
     assert record["duration_ms"] == 123.46
     assert record["success"] is True
+    assert record["request"] == ""
+    assert record["failure_reason"] == ""
     assert "timestamp" in record
+
+
+def test_log_skill_run_can_record_failure_context(tmp_path):
+    log_path = tmp_path / "skill_runs.jsonl"
+
+    log_skill_run(
+        "bug_fix",
+        "OllamaProvider",
+        "qwen3.5:4b",
+        123.456,
+        False,
+        request="/skill bug_fix failing input",
+        failure_reason="boom",
+        log_path=log_path,
+    )
+
+    record = read_skill_runs(log_path)[0]
+    assert record["success"] is False
+    assert record["request"] == "/skill bug_fix failing input"
+    assert record["failure_reason"] == "boom"
 
 
 def test_log_skill_run_appends_without_truncating(tmp_path):

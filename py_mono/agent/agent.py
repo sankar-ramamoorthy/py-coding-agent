@@ -12,6 +12,7 @@ from py_mono.config import WORKSPACE_ROOT, ENABLE_DYNAMIC_TOOLS
 from py_mono.skill.approval import run_skill_safe, ApprovalError,wrap_agent_tools
 from py_mono.skill.validator import validate_skill_py
 from py_mono.skill import approval_ledger
+from py_mono.skill.diffing import candidate_dir_for, has_candidate, promote_candidate
 from py_mono.playbook.playbookregistry import PlaybookRegistry
 from py_mono.tools.tool_loader import load_dynamic_tools
 from pathlib import Path
@@ -363,6 +364,20 @@ class Agent:
         """
         if self.skill_registry is None:
             return "[SKILL] No skill registry configured."
+
+        skill_dir = self.skill_registry.skills_dir / skill_name
+        if has_candidate(skill_dir):
+            candidate_py_path = candidate_dir_for(skill_dir) / "skill.py"
+            code = candidate_py_path.read_text(encoding="utf-8")
+            result = validate_skill_py(code, skill_name)
+            if not result.valid:
+                return (
+                    f"[APPROVE] Candidate for skill '{skill_name}' failed validation — not approved.\n"
+                    f"{result.failure_reason()}"
+                )
+            if not promote_candidate(skill_dir):
+                return f"[APPROVE] Candidate for skill '{skill_name}' could not be promoted."
+            self.skill_registry.reload_skill(skill_name)
 
         # Check skill exists
         skill_md_content = self.skill_registry.get_skill_md(skill_name)

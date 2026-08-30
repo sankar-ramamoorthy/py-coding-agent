@@ -42,7 +42,7 @@ a separate, later decision.
 | Milestone | Status | Theme |
 | --- | --- | --- |
 | M6 | Done | Reliability foundation — CI, open-bug cleanup, model/task fitness check |
-| M7 | Draft, not started | Skill lifecycle graph — Critique/Test stages, diff-on-regen, failure-driven evolution |
+| M7 | Core complete, closeout open | Skill lifecycle graph — Critique/Test stages, diff-on-regen, failure-driven evolution |
 | M8 | Draft, gated | Skill provenance & sharing — signed packages, gated on the audience question |
 | Gated/deferred | Awaiting decision | Everything blocked on "personal tool vs. multi-user" |
 
@@ -96,7 +96,8 @@ modes every session.
 
 ## M7 — Skill Lifecycle Graph
 
-**Status:** Draft, not started
+**Status:** Core complete — `ISS-015`, `ISS-016`, and `ISS-017` done. M7 closeout remains open
+as `ISS-018` persistence/reporting first, then `ISS-019` CLI/UX review polish.
 
 **What this merges:** three ideas that came up separately this session —
 "diff skills on regeneration," "let a failed skill propose its own fix," and the new request to
@@ -167,6 +168,15 @@ Draft(SKILL.md) → Critique → Generate(skill.py) → Validate → Test(smoke 
   `duration`, `success`). M6 ships first and already can't build its fitness check without
   this, so the minimal version is built there (see M6 Scope above). This milestone extends that
   same log rather than building a second one.
+
+**Closeout order before M8:**
+1. `ISS-018` — persist and report skill lifecycle state: durable candidate/lifecycle metadata,
+   inspectable reports, baseline/diff/test/failure-context records; lightweight only, no
+   dashboard unless explicitly requested.
+2. `ISS-019` — polish CLI UX for lifecycle review: `/skill help`, `/skill list`, generation
+   output, candidate review, diff display, and `/approve` messaging.
+3. Revisit `ISS-008` as the M8 prerequisite.
+4. Start M8 after the closeout and prerequisite decisions are resolved.
 
 ---
 

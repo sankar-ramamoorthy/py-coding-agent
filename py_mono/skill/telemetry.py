@@ -27,6 +27,8 @@ def log_skill_run(
     model: str,
     duration_ms: float,
     success: bool,
+    request: str = "",
+    failure_reason: str = "",
     log_path: Path = TELEMETRY_LOG,
 ) -> None:
     """Append one telemetry record as a JSON line.
@@ -41,6 +43,8 @@ def log_skill_run(
         "model": model,
         "duration_ms": round(duration_ms, 2),
         "success": success,
+        "request": request,
+        "failure_reason": failure_reason,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     try:
