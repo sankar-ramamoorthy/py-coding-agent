@@ -125,6 +125,24 @@ class Skill(ABC):
         return f"<Skill name={self.name()}>"
 
 
+class IsolatedSkillProxy(Skill):
+    """Main-process metadata proxy for an approved skill file."""
+
+    def __init__(self, name: str, description: str, skill_py_path: Path):
+        self._name = name
+        self._description = description
+        self.skill_py_path = skill_py_path
+
+    def name(self) -> str:
+        return self._name
+
+    def description(self) -> str:
+        return self._description
+
+    def run(self, request: str, context: SkillContext) -> str:
+        raise RuntimeError("Isolated skill proxies must be run through run_skill_safe")
+
+
 # ---------------------------------------------------------------------------
 # SkillRegistry
 # ---------------------------------------------------------------------------
@@ -203,10 +221,12 @@ class SkillRegistry:
                     approval_ledger.is_approved(ledger, ledger_name, skill_py)
                     for ledger_name in ledger_names
                 ):
-                    skill = self._load_skill_py(skill_py, name)
-                    if skill:
-                        self._skills[name] = skill
-                        logger.info(f"✅ Loaded skill '{name}' (status=approved)")
+                    self._skills[name] = IsolatedSkillProxy(
+                        name,
+                        meta.get("description", "(no description)"),
+                        skill_py,
+                    )
+                    logger.info(f"Loaded isolated skill proxy '{name}' (status=approved)")
                 else:
                     logger.info(
                         f"🔒 Skill '{name}' has skill.py but is not approved/ledger-matched "
@@ -252,15 +272,13 @@ class SkillRegistry:
                 approval_ledger.is_approved(ledger, ledger_name, skill_py)
                 for ledger_name in ledger_names
             ):
-                skill = self._load_skill_py(skill_py, name)
-                if skill:
-                    self._skills[name] = skill
-                    logger.info(f"🔄 Reloaded skill '{name}'")
-                    return True
-                else:
-                    self._skills.pop(name, None)
-                    logger.warning(f"Failed to reload skill '{name}'")
-                    return False
+                self._skills[name] = IsolatedSkillProxy(
+                    name,
+                    meta.get("description", "(no description)"),
+                    skill_py,
+                )
+                logger.info(f"Reloaded isolated skill proxy '{name}'")
+                return True
             else:
                 self._skills.pop(name, None)
                 logger.info(

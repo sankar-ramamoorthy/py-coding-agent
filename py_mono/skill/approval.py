@@ -4,9 +4,10 @@ import time
 from collections.abc import Mapping
 from typing import Optional, Dict
 
-from py_mono.skill.base import SkillRegistry, SkillContext, Skill
+from py_mono.skill.base import IsolatedSkillProxy, SkillRegistry, SkillContext, Skill
 from py_mono.skill.telemetry import log_skill_run
 from py_mono.skill.fitness import check_model_fitness
+from py_mono.skill.worker import run_skill_in_worker
 
 
 class ApprovalError(Exception):
@@ -158,7 +159,16 @@ def run_skill_safe(
     success = False
     failure_reason = ""
     try:
-        result = skill.run(request, safe_context)
+        if isinstance(skill, IsolatedSkillProxy):
+            result = run_skill_in_worker(
+                skill_py_path=skill.skill_py_path,
+                skill_name=skill_name,
+                request=request,
+                context=context,
+                allowed_tools=allowed_tools,
+            )
+        else:
+            result = skill.run(request, safe_context)
         success = True
         if fitness_warning:
             return f"{fitness_warning}\n\n{result}"

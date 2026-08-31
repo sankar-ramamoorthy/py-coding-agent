@@ -15,15 +15,17 @@ the first lifecycle slice, `ISS-016` implemented diff-on-regeneration, and `ISS-
 implemented failure-driven skill evolution. `ISS-018` added durable Markdown and JSON lifecycle
 reports for generated, regenerated, evolved, and failed skill candidate attempts. `ISS-019` added
 CLI review polish: `/skill review <name>`, pending-candidate markers in list/help, generation
-output pointing to review, and clearer candidate approval messages. The remaining pre-M8 item is
-`ISS-008`.
+output pointing to review, and clearer candidate approval messages. `ISS-008` added subprocess
+worker execution for approved skills and dynamic tools, with parent-enforced JSON-line RPC for
+skill tool calls. All tracked pre-M8 issues are complete.
 
 ## Known critical/open issues
 
 See `docs/ISSUES.md` for the live register. As of 2026-08-31, all M5 and M6 issues are closed.
 Open tracked work:
 
-- `ISS-008` (Gated / M8 prerequisite): full isolated-worker execution for skills/dynamic tools.
+- None currently filed in `docs/ISSUES.md`. The next decision is whether to start M8 skill
+  provenance/sharing.
 
 ## Architecture references
 

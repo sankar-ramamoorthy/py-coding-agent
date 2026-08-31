@@ -30,6 +30,7 @@ Inspired by autonomous agent systems like pi‑mono, this project explores **too
 * Local Ollama support (default, zero extra dependencies)  
 * **MCP Server integration via FastMCP + HTTP**  
 * **Runtime LLM provider switching and model binding** via `/provider <name> [model]` and `/providers`  
+* **Isolated worker execution for approved skills and dynamic tools**
 
 ---
 
@@ -117,6 +118,10 @@ User → Agent → LLM → create_tool → Tool file saved in dynamic_tools/
 ```
 
 ---
+
+Dynamic tool discovery uses static metadata extraction; generated dynamic-tool modules are not
+imported into the agent process during load. When a dynamic tool is invoked, it runs in a
+subprocess worker and returns through the normal `Tool.run(**kwargs)` interface.
 
 ### Session & Memory Management
 
@@ -294,6 +299,9 @@ Run normal tasks (all of these automatically use the currently active provider):
 ## Skills Layer (Milestone 5)
 
 Skills are first-class, approval-gated workflows, invoked with `/skill <name>`. All follow ADR-016: they only use tools from the registry, never direct syscalls, and only run once `status: approved` in their `SKILL.md`.
+Approved skill files load as metadata proxies in the agent process and execute in subprocess
+workers when invoked. Worker-executed skills can call parent tools only through JSON-line RPC,
+with the parent enforcing `allowed_tools`.
 
 ```
 /skill list                    → show all skills

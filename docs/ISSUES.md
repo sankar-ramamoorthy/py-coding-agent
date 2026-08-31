@@ -46,7 +46,6 @@ issue's own section below the index, not in the index table — keeps the table 
 
 | ID | Status | Milestone | Title | Branch |
 | --- | --- | --- | --- | --- |
-| ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
 
 ## Closed Index
 
@@ -70,26 +69,33 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-017 | done | M7 | Propose skill revisions from failure context | implement-m7-skill-lifecycle |
 | ISS-018 | done | M7 closeout | Persist and report skill lifecycle state | iss-018-lifecycle-reports |
 | ISS-019 | done | M7 closeout | Polish CLI UX for lifecycle review | iss-019-lifecycle-cli-polish |
+| ISS-008 | done | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | iss-008-isolated-worker-execution |
 
 ---
 
 ## Open / Tracked — Detail
 
-### ISS-008 — Full isolated-worker execution for skills/dynamic tools
-- **Milestone:** Gated / deferred — prerequisite for M8, not part of M6
-- **Source:** `docs/project-audit-2026-08-02.md` (C-03) remediation, deferred 2026-08-03 during
-  ISS-003
-- **What:** the audit's full C-03 recommendation was "execute approved extensions in an isolated
-  worker with narrow tool RPC" — a materially larger infrastructure project (real
-  process/container isolation plus a constrained tool-call protocol)
-- **Scope:** explicitly out of scope for ISS-003's fix, which closed the "runs before approval"
-  gap via a hash-ledger gate, not content-level sandboxing
-- **Status:** tracked for future consideration, not started — also a prerequisite for
-  Milestone 8 (`docs/ROADMAP_PLAN.md`), not just "eventually"
-
 ---
 
 ## Closed — Detail
+
+### ISS-008 — Full isolated-worker execution for skills/dynamic tools
+- **Milestone:** Gated / deferred — prerequisite for M8
+- **Source:** `docs/project-audit-2026-08-02.md` (C-03) remediation, deferred 2026-08-03 during
+  ISS-003
+- **Fix:** approved skills now load as `IsolatedSkillProxy` metadata objects instead of importing
+  `skill.py` in the agent process. `run_skill_safe` executes those proxies in a subprocess worker.
+- **RPC behavior:** worker-executed skills can request parent tool calls through JSON-line RPC.
+  The parent enforces the existing `allowed_tools` policy, rejects unknown/disallowed tools, and
+  keeps direct `tool.func` access unavailable.
+- **Dynamic tools:** `load_dynamic_tools()` now performs static safety checks and AST metadata
+  extraction, returning worker-backed `Tool` proxies. Generated dynamic-tool modules are not
+  imported in the agent process during discovery; they run in a subprocess worker on invocation.
+- **Scope note:** this is real process isolation for generated extension execution, with a narrow
+  synchronous RPC bridge. It does not add a persistent worker pool or container-per-call hardening.
+- **Tests:** added `tests/test_skill_worker.py`, updated skill load-gating expectations, and added
+  dynamic-tool worker coverage. Validation: `uv run pytest -q` -> 174 passed, 1 skipped;
+  `uv run python -m compileall -q py_mono skills` -> exit 0.
 
 ### ISS-019 — Polish CLI UX for lifecycle review
 - **Milestone:** M7 closeout

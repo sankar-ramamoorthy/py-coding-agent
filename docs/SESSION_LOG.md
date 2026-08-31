@@ -786,3 +786,67 @@ source.
 
 **Next safe action**: Commit and merge `iss-019-lifecycle-cli-polish`, then create an `ISS-008`
 branch from `main` and start the isolated-worker execution design/implementation.
+
+---
+
+## 2026-08-31 -- Implement ISS-008 isolated worker execution
+**Issue**: `ISS-008` (Full isolated-worker execution for skills/dynamic tools)
+
+**Scope completed**:
+- Created the Spec Kit artifacts for `ISS-008` under `specs/018-isolated-worker-execution/`.
+- Added `IsolatedSkillProxy` so approved skills load as metadata proxies instead of importing
+  `skill.py` in the agent process.
+- Added `py_mono/skill/worker.py`, a per-invocation subprocess worker for approved skill files.
+- Routed `run_skill_safe` through the worker for isolated skill proxies while preserving direct
+  execution for in-memory test skills.
+- Added JSON-line RPC from skill workers to the parent for tool calls, with parent-side
+  enforcement of `allowed_tools`, unknown-tool rejection, direct `.func` blocking, provider
+  generation proxying for existing generator skills, timeout handling, and clear worker errors.
+- Added `py_mono/tools/worker.py` for subprocess execution of dynamic tool files.
+- Updated `load_dynamic_tools()` to statically validate and extract `Tool(...)` metadata, returning
+  worker-backed `Tool` proxies without importing generated dynamic-tool modules in the agent
+  process.
+
+**Files changed**:
+- `.specify/feature.json`
+- `py_mono/skill/base.py`
+- `py_mono/skill/approval.py`
+- `py_mono/skill/worker.py`
+- `py_mono/tools/tool_loader.py`
+- `py_mono/tools/worker.py`
+- `tests/test_skill_worker.py`
+- `tests/test_skill_load_gating.py`
+- `tests/tools/test_tool_loader.py`
+- `README.md`
+- `docs/ISSUES.md`
+- `docs/PROJECT_STATUS.md`
+- `docs/CURRENT_FOCUS.md`
+- `docs/NEXT_ACTIONS.md`
+- `docs/ROADMAP_PLAN.md`
+- `docs/SESSION_LOG.md`
+- `specs/018-isolated-worker-execution/*`
+
+**Design decisions**:
+- Chose one subprocess per extension invocation instead of a persistent worker pool; simpler and
+  sufficient for the current human-driven CLI.
+- Used JSON-line stdin/stdout RPC to avoid adding dependencies and to match the synchronous
+  `Tool.run(**kwargs)` interface.
+- Kept parent-side enforcement of `allowed_tools`; the worker cannot authorize its own tool calls.
+- Used AST/literal metadata extraction for dynamic tools so discovery remains non-executing.
+- Did not add container-per-call hardening in this issue; the delivered boundary is real process
+  isolation plus narrow RPC.
+
+**Validation**:
+- `uv run pytest -q tests/test_skill_worker.py tests/test_skill_load_gating.py tests/tools/test_tool_loader.py tests/test_skill_approval.py`
+  -- 31 passed.
+- `uv run pytest -q` -- 174 passed, 1 skipped.
+- `uv run python -m compileall -q py_mono skills` -- exit 0. The first sandboxed compile attempt
+  hit the known uv cache permission issue; rerun outside the sandbox completed successfully.
+
+**Open items**:
+- No tracked pre-M8 issues remain open in `docs/ISSUES.md`.
+- M8 skill provenance/sharing still needs the product/audience decision described in
+  `docs/ROADMAP_PLAN.md`.
+
+**Next safe action**: Commit and merge `iss-008-isolated-worker-execution`, then decide whether
+to open the first M8 issue for skill provenance/sharing.
