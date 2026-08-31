@@ -2,7 +2,7 @@
 
 ## Active branch
 
-`iss-008-isolated-worker-execution`
+`m8-provenance-planning`
 
 ## What was just finished
 
@@ -26,8 +26,8 @@
 
 ## Why
 
-All tracked pre-M8 issues are complete on this branch. The next decision is whether to start M8
-skill provenance/sharing.
+All tracked pre-M8 issues are complete and merged to `main`. This branch is positioned for the
+next decision: whether to start M8 skill provenance/sharing.
 
 ## Not being worked on right now
 
