@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 
 from py_mono.skill import approval_ledger
@@ -134,6 +135,16 @@ def test_generate_skill_success_reports_lifecycle_and_remains_proposed(tmp_path,
 
     skill_md = (tmp_path / "echo-request" / "SKILL.md").read_text(encoding="utf-8")
     assert "status: proposed" in skill_md
+    report_md = tmp_path / "echo-request" / "lifecycle_report.md"
+    report_json = tmp_path / "echo-request" / "lifecycle_report.json"
+    assert report_md.exists()
+    assert report_json.exists()
+    report = json.loads(report_json.read_text(encoding="utf-8"))
+    assert report["skill_name"] == "echo-request"
+    assert report["mode"] == "create"
+    assert report["status"] == "proposed"
+    assert report["smoke_test"]["status"] == "passed"
+    assert "Lifecycle report:" in result
 
 
 def test_generate_skill_success_does_not_write_approval_ledger(tmp_path, monkeypatch):
@@ -145,6 +156,31 @@ def test_generate_skill_success_does_not_write_approval_ledger(tmp_path, monkeyp
         make_context([SKILL_MD, VALID_SKILL_PY]),
     )
 
+    ledger = approval_ledger.load_ledger(approval_ledger.ledger_path_for(tmp_path))
+    assert "echo-request" not in ledger
+
+
+def test_generate_skill_surfaces_lifecycle_report_write_failure(tmp_path, monkeypatch):
+    module = load_generate_skill_module()
+    monkeypatch.setattr(module, "SKILLS_DIR", tmp_path)
+
+    monkeypatch.setattr(
+        module,
+        "write_lifecycle_report",
+        lambda **kwargs: module.ReportWriteResult(
+            ok=False,
+            report_dir=kwargs["report_dir"],
+            error="PermissionError: denied",
+        ),
+    )
+
+    result = module.GenerateSkill().run(
+        "/skill generate_skill echo-request | Return the request text unchanged.",
+        make_context([SKILL_MD, VALID_SKILL_PY]),
+    )
+
+    assert "WARNING: Lifecycle report could not be written: PermissionError: denied" in result
+    assert "Status: proposed" in result
     ledger = approval_ledger.load_ledger(approval_ledger.ledger_path_for(tmp_path))
     assert "echo-request" not in ledger
 
@@ -163,6 +199,11 @@ def test_generate_skill_smoke_failure_blocks_approval_ready_response(tmp_path, m
     assert "Propose: skipped" in result
     assert "Approve: /approve echo-request" not in result
     assert "Status: proposed" not in result
+    report = json.loads(
+        (tmp_path / "echo-request" / "lifecycle_report.json").read_text(encoding="utf-8")
+    )
+    assert report["status"] == "failed"
+    assert report["smoke_test"]["failure_reason"] == "RuntimeError: cannot run"
 
 
 def test_generate_skill_regeneration_writes_candidate_and_shows_diff(tmp_path, monkeypatch):
@@ -183,6 +224,12 @@ def test_generate_skill_regeneration_writes_candidate_and_shows_diff(tmp_path, m
     assert ".candidate" in result
     assert (skill_dir / "skill.py").read_text(encoding="utf-8").find('return "old"') != -1
     assert (skill_dir / ".candidate" / "skill.py").exists()
+    report = json.loads(
+        (skill_dir / ".candidate" / "lifecycle_report.json").read_text(encoding="utf-8")
+    )
+    assert report["mode"] == "regenerate"
+    assert report["baseline"]["available"] is True
+    assert [diff["artifact"] for diff in report["diffs"]] == ["SKILL.md", "skill.py"]
 
 
 def test_generate_skill_regeneration_reports_missing_baseline(tmp_path, monkeypatch):
@@ -264,6 +311,12 @@ def test_generate_skill_evolve_uses_failure_context_and_lifecycle(tmp_path, monk
     write_approved_existing_skill(tmp_path)
 
     class FailureContext:
+        request = "/skill echo-request explode"
+        failure_reason = "RuntimeError: boom"
+        provider = "litellm"
+        model = "stub-model"
+        timestamp = "2026-08-31T12:00:00+00:00"
+
         def to_prompt_text(self):
             return "Recent failure for skill 'echo-request': boom"
 
@@ -282,3 +335,10 @@ def test_generate_skill_evolve_uses_failure_context_and_lifecycle(tmp_path, monk
     assert ".candidate" in result
     first_prompt = context.session_manager.provider.messages[0][0]["content"]
     assert "Recent failure for skill 'echo-request': boom" in first_prompt
+    report = json.loads(
+        (tmp_path / "echo-request" / ".candidate" / "lifecycle_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert report["mode"] == "evolve"
+    assert report["failure_context"]["failure_reason"] == "RuntimeError: boom"

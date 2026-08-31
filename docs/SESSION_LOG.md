@@ -671,3 +671,63 @@ accepted.
 
 **Next safe action**: Commit and merge `implement-m7-skill-lifecycle`; next feature work should
 start with Spec Kit for `ISS-018`.
+
+---
+
+## 2026-08-31 -- Implement ISS-018 lifecycle state reports
+**Issue**: `ISS-018` (Persist and report skill lifecycle state)
+
+**Scope completed**:
+- Created the Spec Kit artifacts for `ISS-018` under `specs/016-lifecycle-state-reports/`.
+- Added durable lifecycle report persistence for generated, regenerated, evolved, and failed
+  skill candidate attempts.
+- Reports are written as both Markdown and JSON next to proposed artifacts:
+  `skills/<name>/lifecycle_report.{md,json}` for new skill proposals and
+  `skills/<name>/.candidate/lifecycle_report.{md,json}` for regeneration/evolution proposals.
+- Reports include lifecycle stage results, smoke-test request/output/failure details, baseline
+  availability, rendered diffs, evolution failure context, and review/approval next steps.
+- Preserved the approval boundary: report writing does not approve, load, or execute proposed
+  skills.
+- Updated candidate promotion so approving a regeneration/evolution candidate preserves the
+  lifecycle report at the skill root while removing `.candidate/` as before.
+- Updated the `generate_skill` approval-ledger hash for the intentional implementation change.
+
+**Files changed**:
+- `.specify/feature.json`
+- `py_mono/skill/reporting.py`
+- `py_mono/skill/diffing.py`
+- `skills/generate_skill/skill.py`
+- `skills/.approvals.json`
+- `tests/test_skill_lifecycle_reporting.py`
+- `tests/test_generate_skill.py`
+- `README.md`
+- `docs/ISSUES.md`
+- `docs/PROJECT_STATUS.md`
+- `docs/CURRENT_FOCUS.md`
+- `docs/NEXT_ACTIONS.md`
+- `docs/ROADMAP_PLAN.md`
+- `docs/SESSION_LOG.md`
+- `specs/016-lifecycle-state-reports/*`
+
+**Design decisions**:
+- Stored reports beside the candidate artifacts because that is already the review surface.
+- Wrote Markdown for human inspection and JSON as a stable structured source for `ISS-019` CLI
+  polish.
+- Treated report write failures as visible warnings, not candidate validation failures, so report
+  persistence cannot corrupt or approve skill artifacts.
+- Kept historical report indexing and dashboards out of scope.
+
+**Validation**:
+- `uv run pytest -q tests/test_skill_lifecycle_reporting.py tests/test_generate_skill.py` --
+  12 passed.
+- `uv run pytest -q` -- 165 passed, 1 skipped.
+- `uv run python -m compileall -q py_mono skills` -- exit 0. The first sandboxed compile attempt
+  hit the known uv cache permission issue; rerun outside the sandbox completed successfully.
+
+**Open items**:
+- `ISS-019` remains open for CLI/UX polish around lifecycle review.
+- `ISS-008` remains open as the real isolated-worker execution prerequisite before M8.
+
+**Next safe action**: Commit and merge `iss-018-lifecycle-reports`, then create an `ISS-019`
+branch from `main` and start CLI review polish using the new report JSON as the stable display
+source.

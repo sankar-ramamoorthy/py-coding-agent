@@ -3,7 +3,7 @@ title: Issues Register
 type: index
 status: canonical
 created: 2026-08-03
-updated: 2026-08-30
+updated: 2026-08-31
 ---
 
 # Issues Register
@@ -47,7 +47,6 @@ issue's own section below the index, not in the index table — keeps the table 
 | ID | Status | Milestone | Title | Branch |
 | --- | --- | --- | --- | --- |
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
-| ISS-018 | open | M7 closeout | Persist and report skill lifecycle state | — |
 | ISS-019 | open | M7 closeout | Polish CLI UX for lifecycle review | — |
 
 ## Closed Index
@@ -70,6 +69,7 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-015 | done | M7 | Add first skill lifecycle graph slice | implement-m7-skill-lifecycle |
 | ISS-016 | done | M7 | Show diff when regenerating an existing skill | implement-m7-skill-lifecycle |
 | ISS-017 | done | M7 | Propose skill revisions from failure context | implement-m7-skill-lifecycle |
+| ISS-018 | done | M7 closeout | Persist and report skill lifecycle state | iss-018-lifecycle-reports |
 
 ---
 
@@ -87,18 +87,6 @@ issue's own section below the index, not in the index table — keeps the table 
 - **Status:** tracked for future consideration, not started — also a prerequisite for
   Milestone 8 (`docs/ROADMAP_PLAN.md`), not just "eventually"
 
-### ISS-018 — Persist and report skill lifecycle state
-- **Milestone:** M7 closeout
-- **Source:** 2026-08-30 user-directed M7 closeout split after completion of `ISS-015`,
-  `ISS-016`, and `ISS-017`
-- **What:** add durable, inspectable lifecycle state for generated and regenerated skill
-  candidates.
-- **Scope:** lightweight persistence for candidate/lifecycle metadata, lifecycle reports,
-  baseline references, rendered diff records, smoke-test results, and failure-context records.
-  Keep this to file-backed state and reports; no dashboard unless explicitly requested.
-- **Order:** do before `ISS-019`, because CLI polish needs stable state to display.
-- **Status:** open, not started.
-
 ### ISS-019 — Polish CLI UX for lifecycle review
 - **Milestone:** M7 closeout
 - **Source:** 2026-08-30 user-directed M7 closeout split after completion of `ISS-015`,
@@ -112,6 +100,29 @@ issue's own section below the index, not in the index table — keeps the table 
 ---
 
 ## Closed — Detail
+
+### ISS-018 — Persist and report skill lifecycle state
+- **Milestone:** M7 closeout
+- **Source:** 2026-08-30 user-directed M7 closeout split after completion of `ISS-015`,
+  `ISS-016`, and `ISS-017`
+- **Fix:** added `py_mono/skill/reporting.py` to persist lifecycle reports as both Markdown
+  and JSON. Successful new skill proposals write `lifecycle_report.md` and
+  `lifecycle_report.json` under `skills/<name>/`; regeneration and evolution proposals write
+  the same files under `skills/<name>/.candidate/`.
+- **Report contents:** reports include skill name, mode, final status, timestamp, skill and
+  candidate paths, ordered lifecycle stage results, smoke-test request/output/failure details,
+  baseline availability, rendered diffs for regenerated/evolved `SKILL.md` and `skill.py`,
+  evolution failure context, and next review/approval steps.
+- **Failure behavior:** validation, smoke-test, generation, and save failures attempt to write a
+  failure report before returning. Report write failures are surfaced to the caller but do not
+  approve, load, or corrupt skill artifacts.
+- **Approval behavior:** approving a `.candidate` still removes the candidate directory; its
+  lifecycle report is retained at the approved skill root. The approval hash ledger remains the
+  authority for executable skills and was updated only for the intentional `generate_skill`
+  implementation change.
+- **Tests:** added `tests/test_skill_lifecycle_reporting.py` and report assertions in
+  `tests/test_generate_skill.py`. Validation: `uv run pytest -q` -> 165 passed, 1 skipped;
+  `uv run python -m compileall -q py_mono skills` -> exit 0.
 
 ### ISS-017 — Propose skill revisions from failure context
 - **Milestone:** M7
