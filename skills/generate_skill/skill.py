@@ -40,6 +40,7 @@ from py_mono.skill.lifecycle import (
     smoke_test_generated_skill,
 )
 from py_mono.skill.prompts import build_skill_md_prompt, build_skill_py_prompt
+from py_mono.skill.reporting import ReportWriteResult, write_lifecycle_report
 from py_mono.skill.validator import validate_skill_md, validate_skill_py
 
 logger = logging.getLogger(__name__)
@@ -104,10 +105,20 @@ class GenerateSkill(Skill):
             lifecycle.add(STAGE_VALIDATE, STATUS_SKIPPED, "Generation failed.")
             lifecycle.add(STAGE_TEST, STATUS_SKIPPED, "Generation failed.")
             lifecycle.add(STAGE_PROPOSE, STATUS_SKIPPED, "Generation failed.")
+            report_result = self._write_lifecycle_report(
+                skill_name=skill_name,
+                mode=mode,
+                status="failed",
+                lifecycle=lifecycle,
+                skill_path=skill_path,
+                report_dir=skill_path,
+                next_steps=["Try again."],
+            )
             return self._build_failed_lifecycle_response(
                 skill_name=skill_name,
                 lifecycle=lifecycle,
                 next_step="Try again.",
+                report_result=report_result,
             )
 
         md_result = validate_skill_md(
@@ -143,13 +154,25 @@ class GenerateSkill(Skill):
             )
             lifecycle.add(STAGE_TEST, STATUS_SKIPPED, "Validation failed.")
             lifecycle.add(STAGE_PROPOSE, STATUS_SKIPPED, "Validation failed.")
+            next_step = (
+                "Try rephrasing your description or switch to a more capable model:\n"
+                "  /provider litellm groq/qwen/qwen3-32b"
+            )
+            report_result = self._write_lifecycle_report(
+                skill_name=skill_name,
+                mode=mode,
+                status="failed",
+                lifecycle=lifecycle,
+                skill_path=skill_path,
+                report_dir=skill_path,
+                failure_context=failure_context,
+                next_steps=next_step.splitlines(),
+            )
             return self._build_failed_lifecycle_response(
                 skill_name=skill_name,
                 lifecycle=lifecycle,
-                next_step=(
-                    "Try rephrasing your description or switch to a more capable model:\n"
-                    "  /provider litellm groq/qwen/qwen3-32b"
-                ),
+                next_step=next_step,
+                report_result=report_result,
             )
 
         lifecycle.add(STAGE_VALIDATE, STATUS_PASSED, "Generated skill.py passed validation.")
@@ -168,10 +191,22 @@ class GenerateSkill(Skill):
                 [smoke_result.failure_reason],
             )
             lifecycle.add(STAGE_PROPOSE, STATUS_SKIPPED, "Smoke test failed.")
+            report_result = self._write_lifecycle_report(
+                skill_name=skill_name,
+                mode=mode,
+                status="failed",
+                lifecycle=lifecycle,
+                skill_path=skill_path,
+                report_dir=skill_path,
+                smoke_test=smoke_result,
+                failure_context=failure_context,
+                next_steps=["Retry generation after adjusting the skill description."],
+            )
             return self._build_failed_lifecycle_response(
                 skill_name=skill_name,
                 lifecycle=lifecycle,
                 next_step="Retry generation after adjusting the skill description.",
+                report_result=report_result,
             )
 
         smoke_details = []
@@ -189,14 +224,27 @@ class GenerateSkill(Skill):
                 write_path = write_candidate(skill_path, skill_md_content, skill_py_content)
         except Exception as e:
             lifecycle.add(STAGE_PROPOSE, STATUS_FAILED, f"Failed to save skill files: {e}")
+            report_result = self._write_lifecycle_report(
+                skill_name=skill_name,
+                mode=mode,
+                status="failed",
+                lifecycle=lifecycle,
+                skill_path=skill_path,
+                report_dir=skill_path,
+                smoke_test=smoke_result,
+                failure_context=failure_context,
+                next_steps=["Check filesystem permissions and try again."],
+            )
             return self._build_failed_lifecycle_response(
                 skill_name=skill_name,
                 lifecycle=lifecycle,
                 next_step="Check filesystem permissions and try again.",
+                report_result=report_result,
             )
 
         lifecycle.add(STAGE_PROPOSE, STATUS_PASSED, "Skill saved as proposed.")
         diff_report = ""
+        diffs = []
         if mode in ("regenerate", "evolve"):
             baseline = load_approved_baseline(SKILLS_DIR, skill_name)
             diffs = [
@@ -216,6 +264,20 @@ class GenerateSkill(Skill):
                 ),
             ]
             diff_report = render_diff_report(diffs)
+        next_steps = self._next_steps(skill_name, write_path, mode)
+        report_result = self._write_lifecycle_report(
+            skill_name=skill_name,
+            mode=mode,
+            status="proposed",
+            lifecycle=lifecycle,
+            skill_path=skill_path,
+            report_dir=write_path,
+            candidate_path=write_path,
+            smoke_test=smoke_result,
+            diffs=diffs,
+            failure_context=failure_context,
+            next_steps=next_steps,
+        )
         return self._build_response(
             skill_name=skill_name,
             skill_path=write_path,
@@ -226,6 +288,7 @@ class GenerateSkill(Skill):
             mode=mode,
             diff_report=diff_report,
             failure_context=failure_context.to_prompt_text() if failure_context else "",
+            report_result=report_result,
         )
 
     def _parse_request(self, request: str):
@@ -394,6 +457,7 @@ class GenerateSkill(Skill):
         mode: str = "create",
         diff_report: str = "",
         failure_context: str = "",
+        report_result: Optional[ReportWriteResult] = None,
     ) -> str:
         lines = []
 
@@ -418,14 +482,11 @@ class GenerateSkill(Skill):
             lines.append("")
         lines.append("Status: proposed - not yet executable.")
         lines.append(f"Location: {skill_path}")
+        self._append_report_lines(lines, report_result)
         lines.append("")
         lines.append("Next steps:")
-        if mode == "create":
-            lines.append(f"  1. Review:  /skill help {skill_name}")
-        else:
-            lines.append(f"  1. Review:  {skill_path}")
-        lines.append(f"  2. Approve: /approve {skill_name}")
-        lines.append(f"  3. Run:     /skill {skill_name}")
+        for index, step in enumerate(self._next_steps(skill_name, skill_path, mode), 1):
+            lines.append(f"  {index}. {step}")
         lines.append("")
 
         preview_lines = skill_py_content.splitlines()[:8]
@@ -439,14 +500,74 @@ class GenerateSkill(Skill):
         skill_name: str,
         lifecycle: SkillLifecycleRun,
         next_step: str,
+        report_result: Optional[ReportWriteResult] = None,
     ) -> str:
-        return "\n".join(
+        lines = [
+            f"Skill '{skill_name}' could NOT be proposed.",
+            "",
+            lifecycle.render(),
+            "",
+        ]
+        self._append_report_lines(lines, report_result)
+        lines.extend(
             [
-                f"Skill '{skill_name}' could NOT be proposed.",
-                "",
-                lifecycle.render(),
-                "",
                 "Next step:",
                 f"  {next_step}",
             ]
+        )
+        return "\n".join(lines)
+
+    def _next_steps(self, skill_name: str, skill_path: Path, mode: str) -> list[str]:
+        if mode == "create":
+            review_step = f"Review:  /skill help {skill_name}"
+        else:
+            review_step = f"Review:  {skill_path}"
+        return [
+            review_step,
+            f"Approve: /approve {skill_name}",
+            f"Run:     /skill {skill_name}",
+        ]
+
+    def _write_lifecycle_report(
+        self,
+        *,
+        skill_name: str,
+        mode: str,
+        status: str,
+        lifecycle: SkillLifecycleRun,
+        skill_path: Path,
+        report_dir: Path,
+        candidate_path: Optional[Path] = None,
+        smoke_test=None,
+        diffs=None,
+        failure_context=None,
+        next_steps: Optional[list[str]] = None,
+    ) -> ReportWriteResult:
+        return write_lifecycle_report(
+            report_dir=report_dir,
+            skill_name=skill_name,
+            mode=mode,
+            status=status,
+            lifecycle=lifecycle,
+            skill_path=skill_path,
+            candidate_path=candidate_path,
+            smoke_test=smoke_test,
+            diffs=diffs or [],
+            failure_context=failure_context,
+            next_steps=next_steps or [],
+        )
+
+    def _append_report_lines(
+        self,
+        lines: list[str],
+        report_result: Optional[ReportWriteResult],
+    ) -> None:
+        if report_result is None:
+            return
+        if report_result.ok and report_result.markdown_path is not None:
+            lines.append(f"Lifecycle report: {report_result.markdown_path}")
+            return
+        lines.append(
+            "WARNING: Lifecycle report could not be written: "
+            f"{report_result.error or 'unknown error'}"
         )

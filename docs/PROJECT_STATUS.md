@@ -10,19 +10,19 @@ Milestone 6 (Reliability Foundation) is complete. It closed `ISS-005` through `I
 bare `/provider` handling, `generate_skill` quality fixes, minimal CI, per-run skill telemetry,
 and the model/task fitness check.
 
-Milestone 7 (Skill Lifecycle Graph) core scope is complete on branch
-`implement-m7-skill-lifecycle`: `ISS-015` implemented the first lifecycle slice,
-`ISS-016` implemented diff-on-regeneration, and `ISS-017` implemented failure-driven skill
-evolution. M7 closeout now has two separate open issues by user direction: `ISS-018`
-persistence/reporting first, then `ISS-019` CLI/UX polish.
+Milestone 7 (Skill Lifecycle Graph) core scope is complete and merged: `ISS-015` implemented
+the first lifecycle slice, `ISS-016` implemented diff-on-regeneration, and `ISS-017`
+implemented failure-driven skill evolution. `ISS-018` is complete on branch
+`iss-018-lifecycle-reports`, adding durable Markdown and JSON lifecycle reports for generated,
+regenerated, evolved, and failed skill candidate attempts. The remaining M7 closeout item is
+`ISS-019` CLI/UX polish.
 
 ## Known critical/open issues
 
-See `docs/ISSUES.md` for the live register. As of 2026-08-30, all M5 and M6 issues are closed.
+See `docs/ISSUES.md` for the live register. As of 2026-08-31, all M5 and M6 issues are closed.
 Open tracked work:
 
 - `ISS-008` (Gated / M8 prerequisite): full isolated-worker execution for skills/dynamic tools.
-- `ISS-018` (M7 closeout): persist and report skill lifecycle state.
 - `ISS-019` (M7 closeout): polish CLI UX for lifecycle review.
 
 ## Architecture references

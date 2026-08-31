@@ -42,7 +42,7 @@ a separate, later decision.
 | Milestone | Status | Theme |
 | --- | --- | --- |
 | M6 | Done | Reliability foundation — CI, open-bug cleanup, model/task fitness check |
-| M7 | Core complete, closeout open | Skill lifecycle graph — Critique/Test stages, diff-on-regen, failure-driven evolution |
+| M7 | Core complete, closeout partly complete | Skill lifecycle graph — Critique/Test stages, diff-on-regen, failure-driven evolution, durable reports |
 | M8 | Draft, gated | Skill provenance & sharing — signed packages, gated on the audience question |
 | Gated/deferred | Awaiting decision | Everything blocked on "personal tool vs. multi-user" |
 
@@ -96,8 +96,9 @@ modes every session.
 
 ## M7 — Skill Lifecycle Graph
 
-**Status:** Core complete — `ISS-015`, `ISS-016`, and `ISS-017` done. M7 closeout remains open
-as `ISS-018` persistence/reporting first, then `ISS-019` CLI/UX review polish.
+**Status:** Core complete — `ISS-015`, `ISS-016`, and `ISS-017` done. `ISS-018`
+persistence/reporting is complete on branch `iss-018-lifecycle-reports`; M7 closeout still needs
+`ISS-019` CLI/UX review polish.
 
 **What this merges:** three ideas that came up separately this session —
 "diff skills on regeneration," "let a failed skill propose its own fix," and the new request to
@@ -170,9 +171,9 @@ Draft(SKILL.md) → Critique → Generate(skill.py) → Validate → Test(smoke 
   same log rather than building a second one.
 
 **Closeout order before M8:**
-1. `ISS-018` — persist and report skill lifecycle state: durable candidate/lifecycle metadata,
-   inspectable reports, baseline/diff/test/failure-context records; lightweight only, no
-   dashboard unless explicitly requested.
+1. `ISS-018` — **done.** Persist and report skill lifecycle state: durable candidate/lifecycle
+   metadata, inspectable Markdown and JSON reports, baseline/diff/test/failure-context records;
+   lightweight only, no dashboard unless explicitly requested.
 2. `ISS-019` — polish CLI UX for lifecycle review: `/skill help`, `/skill list`, generation
    output, candidate review, diff display, and `/approve` messaging.
 3. Revisit `ISS-008` as the M8 prerequisite.

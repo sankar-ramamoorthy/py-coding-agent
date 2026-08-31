@@ -130,6 +130,14 @@ def promote_candidate(skill_dir: Path) -> bool:
 
     (skill_dir / "SKILL.md").write_text(skill_md.read_text(encoding="utf-8"), encoding="utf-8")
     (skill_dir / "skill.py").write_text(skill_py.read_text(encoding="utf-8"), encoding="utf-8")
+    for report_name in ("lifecycle_report.md", "lifecycle_report.json"):
+        report_path = candidate_dir / report_name
+        if report_path.exists():
+            (skill_dir / report_name).write_text(
+                report_path.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            report_path.unlink()
     skill_md.unlink()
     skill_py.unlink()
     try:

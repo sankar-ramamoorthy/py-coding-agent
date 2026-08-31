@@ -309,6 +309,14 @@ Skills are first-class, approval-gated workflows, invoked with `/skill <name>`. 
 
 Run `/clear` after creating new skills/playbooks to reload them.
 
+Generated, regenerated, and evolved skill candidates run through the M7 lifecycle
+`Critique -> Generate -> Validate -> Test(smoke run) -> Propose` before review. Successful and
+failed attempts leave durable lifecycle reports beside the proposed artifacts:
+`skills/<name>/lifecycle_report.{md,json}` for new skills and
+`skills/<name>/.candidate/lifecycle_report.{md,json}` for regeneration/evolution candidates.
+Those reports include stage results, smoke-test output or failure, diffs when available, failure
+context for evolution, and the next review/approval steps.
+
 See [`README_Skills.md`](./README_Skills.md) for the skills-layer architecture (Reasoning / Orchestration / Execution layers, ADR-010 approval gate, and how this differs from Claude-style Markdown-only skills) and [`docs/skills.md`](./docs/skills.md) for the full per-skill reference (args, triggers, failure modes). Those files are the single source of truth for the skill list — it isn't duplicated here.
 
 ### Current Limitations
