@@ -731,3 +731,58 @@ start with Spec Kit for `ISS-018`.
 **Next safe action**: Commit and merge `iss-018-lifecycle-reports`, then create an `ISS-019`
 branch from `main` and start CLI review polish using the new report JSON as the stable display
 source.
+
+---
+
+## 2026-08-31 -- Implement ISS-019 lifecycle CLI review polish
+**Issue**: `ISS-019` (Polish CLI UX for lifecycle review)
+
+**Scope completed**:
+- Created the Spec Kit artifacts for `ISS-019` under `specs/017-lifecycle-cli-review/`.
+- Added `/skill review <skill-name>` to summarize lifecycle report JSON from `ISS-018`, with a
+  Markdown fallback when JSON is unavailable or corrupt.
+- Updated `/skill list` to mark skills with pending `.candidate` proposals and point to review.
+- Updated `/skill help <skill-name>` to show pending-candidate review and approval commands.
+- Updated generated skill output to point to `/skill review <skill-name>` before approval.
+- Updated `/approve <skill-name>` output so valid candidate promotion is explicit and retained
+  lifecycle report paths are shown when present; invalid candidates point back to review.
+- Preserved the approval boundary: review reads report/candidate state only and does not execute,
+  approve, or load proposed skills.
+
+**Files changed**:
+- `.specify/feature.json`
+- `py_mono/agent/agent.py`
+- `py_mono/skill/base.py`
+- `py_mono/skill/reporting.py`
+- `skills/generate_skill/skill.py`
+- `skills/.approvals.json`
+- `tests/test_special_commands.py`
+- `tests/test_generate_skill.py`
+- `README.md`
+- `docs/ISSUES.md`
+- `docs/PROJECT_STATUS.md`
+- `docs/CURRENT_FOCUS.md`
+- `docs/NEXT_ACTIONS.md`
+- `docs/ROADMAP_PLAN.md`
+- `docs/SESSION_LOG.md`
+- `specs/017-lifecycle-cli-review/*`
+
+**Design decisions**:
+- Added a dedicated `/skill review` command instead of overloading `/skill help`, keeping help
+  focused on `SKILL.md` while review focuses on lifecycle evidence.
+- Used report JSON as the preferred display source because it is stable for CLI rendering; kept
+  Markdown fallback for resilience.
+- Kept the review command to one skill at a time and did not add a global candidate index.
+
+**Validation**:
+- `uv run pytest -q tests/test_special_commands.py tests/test_generate_skill.py tests/test_skill_lifecycle_reporting.py tests/test_skill_diffing.py`
+  -- 28 passed.
+- `uv run pytest -q` -- 170 passed, 1 skipped.
+- `uv run python -m compileall -q py_mono skills` -- exit 0. The first sandboxed compile attempt
+  hit the known uv cache permission issue; rerun outside the sandbox completed successfully.
+
+**Open items**:
+- `ISS-008` remains open as the real isolated-worker execution prerequisite before M8.
+
+**Next safe action**: Commit and merge `iss-019-lifecycle-cli-polish`, then create an `ISS-008`
+branch from `main` and start the isolated-worker execution design/implementation.

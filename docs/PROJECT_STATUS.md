@@ -12,10 +12,11 @@ and the model/task fitness check.
 
 Milestone 7 (Skill Lifecycle Graph) core scope is complete and merged: `ISS-015` implemented
 the first lifecycle slice, `ISS-016` implemented diff-on-regeneration, and `ISS-017`
-implemented failure-driven skill evolution. `ISS-018` is complete on branch
-`iss-018-lifecycle-reports`, adding durable Markdown and JSON lifecycle reports for generated,
-regenerated, evolved, and failed skill candidate attempts. The remaining M7 closeout item is
-`ISS-019` CLI/UX polish.
+implemented failure-driven skill evolution. `ISS-018` added durable Markdown and JSON lifecycle
+reports for generated, regenerated, evolved, and failed skill candidate attempts. `ISS-019` added
+CLI review polish: `/skill review <name>`, pending-candidate markers in list/help, generation
+output pointing to review, and clearer candidate approval messages. The remaining pre-M8 item is
+`ISS-008`.
 
 ## Known critical/open issues
 
@@ -23,7 +24,6 @@ See `docs/ISSUES.md` for the live register. As of 2026-08-31, all M5 and M6 issu
 Open tracked work:
 
 - `ISS-008` (Gated / M8 prerequisite): full isolated-worker execution for skills/dynamic tools.
-- `ISS-019` (M7 closeout): polish CLI UX for lifecycle review.
 
 ## Architecture references
 

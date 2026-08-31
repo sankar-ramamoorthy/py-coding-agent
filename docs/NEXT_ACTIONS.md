@@ -15,7 +15,7 @@ just delete history.
 - [x] File `ISS-019` for lifecycle CLI/UX polish closeout
 - [x] Commit and merge the M7 core slice work when accepted
 - [x] Start and complete `ISS-018`: persist and report skill lifecycle state
-- [ ] Start `ISS-019`: polish CLI UX for lifecycle review
+- [x] Start and complete `ISS-019`: polish CLI UX for lifecycle review
 - [ ] (Gated / M8 prerequisite) Revisit `ISS-008`: full isolated-worker execution for
       skills/dynamic tools
 - [ ] Start M8 after `ISS-018`, `ISS-019`, and `ISS-008` are resolved or explicitly deferred
