@@ -43,7 +43,7 @@ a separate, later decision.
 | --- | --- | --- |
 | M6 | Done | Reliability foundation — CI, open-bug cleanup, model/task fitness check |
 | M7 | Complete | Skill lifecycle graph — Critique/Test stages, diff-on-regen, failure-driven evolution, durable reports, CLI review |
-| M8 | Draft, gated | Skill provenance & sharing — signed packages, gated on the audience question |
+| M8 | Draft, audience-gated | Skill provenance & sharing — signed packages, gated on the audience question |
 | Gated/deferred | Awaiting decision | Everything blocked on "personal tool vs. multi-user" |
 
 ---
@@ -96,8 +96,9 @@ modes every session.
 
 ## M7 — Skill Lifecycle Graph
 
-**Status:** Complete — `ISS-015`, `ISS-016`, `ISS-017`, `ISS-018`, and `ISS-019` done. Remaining
-pre-M8 work is `ISS-008`, the isolated-worker execution prerequisite.
+**Status:** Complete — `ISS-015`, `ISS-016`, `ISS-017`, `ISS-018`, `ISS-019`, and `ISS-008`
+done. M8 is no longer blocked by the isolated-worker prerequisite; it still needs the audience
+decision described below.
 
 **What this merges:** three ideas that came up separately this session —
 "diff skills on regeneration," "let a failed skill propose its own fix," and the new request to
@@ -176,14 +177,14 @@ Draft(SKILL.md) → Critique → Generate(skill.py) → Validate → Test(smoke 
 2. `ISS-019` — **done.** Polish CLI UX for lifecycle review: `/skill review <name>`,
    `/skill help`, `/skill list`, generation output, candidate review, diff display, and
    `/approve` messaging.
-3. Revisit `ISS-008` as the M8 prerequisite.
-4. Start M8 after the prerequisite is resolved.
+3. `ISS-008` — **done.** Full isolated-worker execution for skills/dynamic tools.
+4. Start M8 after the audience decision is resolved.
 
 ---
 
 ## M8 — Skill Provenance & Sharing
 
-**Status:** Draft, explicitly gated (see Gated / Deferred below)
+**Status:** Draft, explicitly gated on the audience question (see Gated / Deferred below)
 
 The *expensive* half of what got called the "killer feature" this session — deliberately
 separated from M7's cheap half.
@@ -208,7 +209,7 @@ Grouped together because they share one open question, not because they're equal
 
 | Item | Note |
 | --- | --- |
-| `ISS-008` — full isolated-worker execution for skills/dynamic tools | Also a **prerequisite** for M8 specifically, not just "eventually" — can't credibly ship "revocable, inspectable capabilities" as a trust story while execution is still a hash-ledger + static check, not real isolation. See [[ISSUES]]. |
+| `ISS-008` — full isolated-worker execution for skills/dynamic tools | **Done.** The remaining M8 gate is the audience/product decision, not this prerequisite. See [[ISSUES]]. |
 | Milestone 4 (Polish: docs, full workflow testing, packaging) | The actual next milestone if the answer is "yes, other people should use this." Has sat unstarted in `README.md` since M5 shipped ahead of it. |
 | Multi-agent orchestration (planner/coder/tester) | Actively deprioritized this session — adds surface area on top of a core loop that's still shedding bugs. |
 | Memory indexing for tools | Genuinely future — matters once skill/tool count makes discovery hard, which it doesn't yet. |
@@ -245,7 +246,8 @@ are legitimately gated on the audience question above:
 - No editor/IDE integration.
 - No repo-wide context (embeddings/RAG over the codebase).
 - No git-native diff-review workflow for code changes (only for skills, per M7).
-- No sandboxed/isolated execution (`ISS-008`).
+- No container-per-call hardening or persistent worker pool beyond `ISS-008`'s subprocess
+  isolation.
 - No test-driven iteration loop (agent verifying its own work against tests before requesting
   approval) — M7's new **Test** stage (smoke-run before Propose) is a first, narrow step
   toward this, not the full thing: one synthetic trivial case, not real test-driven iteration.

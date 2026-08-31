@@ -2,7 +2,7 @@
 
 ## Active branch
 
-`iss-019-lifecycle-cli-polish`
+`iss-008-isolated-worker-execution`
 
 ## What was just finished
 
@@ -20,18 +20,18 @@
 - `ISS-019` is implemented on this branch: `/skill review <name>` summarizes lifecycle reports,
   `/skill list` and `/skill help <name>` surface pending candidates, generation output points to
   review, and `/approve` explains candidate promotion/rejection.
+- `ISS-008` is implemented on this branch: approved skills load as metadata proxies and execute
+  in subprocess workers; worker skills use parent-enforced JSON-line RPC for tools; dynamic tools
+  load from static metadata and execute in subprocess workers.
 
 ## Why
 
-The M7 closeout items are complete through `ISS-019`. The remaining pre-M8 item is `ISS-008`
-for isolated-worker execution.
+All tracked pre-M8 issues are complete on this branch. The next decision is whether to start M8
+skill provenance/sharing.
 
 ## Not being worked on right now
 
-- `ISS-008` (full isolated-worker-with-RPC execution for skills/tools) remains gated and
-  deferred as an M8 prerequisite.
-- `ISS-008` (full isolated-worker-with-RPC execution for skills/tools) remains the last pre-M8
-  issue to complete.
+- M8 skill provenance/sharing remains a product-scope decision, not active implementation.
 
 ## Milestone note
 
@@ -42,3 +42,4 @@ M7 known core slices as of 2026-08-30:
 - `ISS-017`: failure-driven skill evolution -- done.
 - `ISS-018`: persistence/reporting closeout -- done on branch `iss-018-lifecycle-reports`.
 - `ISS-019`: CLI/UX review polish closeout -- done on branch `iss-019-lifecycle-cli-polish`.
+- `ISS-008`: isolated-worker execution -- done on branch `iss-008-isolated-worker-execution`.

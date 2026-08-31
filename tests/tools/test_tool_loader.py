@@ -37,6 +37,33 @@ def test_valid_dynamic_tool_loads(tmp_path):
     tools = load_dynamic_tools(str(tmp_path))
 
     assert [t.name for t in tools] == ["my_tool"]
+    assert tools[0].run(x="value") == "value"
+
+
+def test_dynamic_tool_load_does_not_execute_module_side_effect_until_run(tmp_path):
+    marker = tmp_path / "marker.txt"
+    marker_path = str(marker).replace("\\", "\\\\")
+    code = f'''
+from pathlib import Path
+from py_mono.tools.tool import Tool
+
+Path(r"{marker_path}").write_text("loaded", encoding="utf-8")
+
+def my_func(x):
+    return x
+
+my_tool = Tool(name="my_tool", description="demo", func=my_func, parameters={{
+    "type": "object", "properties": {{"x": {{"type": "string"}}}}, "required": ["x"]
+}})
+'''
+    (tmp_path / "my_tool.py").write_text(code, encoding="utf-8")
+
+    tools = load_dynamic_tools(str(tmp_path))
+
+    assert [t.name for t in tools] == ["my_tool"]
+    assert not marker.exists()
+    assert tools[0].run(x="value") == "value"
+    assert marker.read_text(encoding="utf-8") == "loaded"
 
 
 def test_forbidden_pattern_file_is_skipped(tmp_path):

@@ -100,8 +100,16 @@ def test_approved_skill_with_matching_ledger_executes(tmp_path):
     registry = SkillRegistry(skills_dir=tmp_path)
     registry.load()
 
-    assert marker.exists()
+    assert not marker.exists()
     assert registry.get("approved_demo") is not None
+    result = Agent(
+        SessionManager(default_provider="ollama"),
+        tools=[],
+        skill_registry=registry,
+        debug=False,
+    )._handle_skill_run("/skill approved_demo")
+    assert "ran" in result
+    assert marker.exists()
 
 
 def test_approved_skill_without_ledger_entry_auto_seeds_and_executes(tmp_path):
@@ -112,7 +120,7 @@ def test_approved_skill_without_ledger_entry_auto_seeds_and_executes(tmp_path):
     registry = SkillRegistry(skills_dir=tmp_path)
     registry.load()
 
-    assert marker.exists()
+    assert not marker.exists()
     ledger = approval_ledger.load_ledger(approval_ledger.ledger_path_for(tmp_path))
     assert ledger["already_approved"]["seeded"] is True
 
@@ -141,8 +149,16 @@ def test_reload_respects_the_same_gate(tmp_path):
     approval_ledger.save_ledger(ledger, ledger_path)
 
     registry.reload_skill("reload_demo")
-    assert marker.exists()
     assert registry.get("reload_demo") is not None
+    assert not marker.exists()
+    result = Agent(
+        SessionManager(default_provider="ollama"),
+        tools=[],
+        skill_registry=registry,
+        debug=False,
+    )._handle_skill_run("/skill reload_demo")
+    assert "ran" in result
+    assert marker.exists()
 
 
 def test_post_approval_edit_invalidates_approval(tmp_path):
@@ -156,8 +172,7 @@ def test_post_approval_edit_invalidates_approval(tmp_path):
 
     registry = SkillRegistry(skills_dir=tmp_path)
     registry.load()
-    assert marker.exists()  # loaded fine, hash matches
-    marker.unlink()
+    assert not marker.exists()
 
     # tamper: edit skill.py after approval, without re-approving
     skill_py.write_text(skill_py.read_text(encoding="utf-8") + "\n# tampered\n", encoding="utf-8")
@@ -181,7 +196,7 @@ def test_auto_seed_trusts_pre_existing_approved_content_without_revalidation(tmp
     registry = SkillRegistry(skills_dir=tmp_path)
     registry.load()
 
-    assert marker.exists()
+    assert not marker.exists()
     ledger = approval_ledger.load_ledger(approval_ledger.ledger_path_for(tmp_path))
     assert ledger["forbidden_demo"]["seeded"] is True
 
@@ -248,5 +263,8 @@ def test_approve_succeeds_for_clean_code_and_then_executes(tmp_path):
     ledger = approval_ledger.load_ledger(approval_ledger.ledger_path_for(tmp_path))
     assert "clean_skill" in ledger
     assert ledger["clean_skill"]["seeded"] is False
+    assert not marker.exists()
+    run_result = agent._handle_skill_run("/skill clean_skill")
+    assert "ran" in run_result
     assert marker.exists()
 
