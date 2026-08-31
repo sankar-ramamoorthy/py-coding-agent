@@ -42,7 +42,7 @@ a separate, later decision.
 | Milestone | Status | Theme |
 | --- | --- | --- |
 | M6 | Done | Reliability foundation — CI, open-bug cleanup, model/task fitness check |
-| M7 | Core complete, closeout partly complete | Skill lifecycle graph — Critique/Test stages, diff-on-regen, failure-driven evolution, durable reports |
+| M7 | Complete | Skill lifecycle graph — Critique/Test stages, diff-on-regen, failure-driven evolution, durable reports, CLI review |
 | M8 | Draft, gated | Skill provenance & sharing — signed packages, gated on the audience question |
 | Gated/deferred | Awaiting decision | Everything blocked on "personal tool vs. multi-user" |
 
@@ -96,9 +96,8 @@ modes every session.
 
 ## M7 — Skill Lifecycle Graph
 
-**Status:** Core complete — `ISS-015`, `ISS-016`, and `ISS-017` done. `ISS-018`
-persistence/reporting is complete on branch `iss-018-lifecycle-reports`; M7 closeout still needs
-`ISS-019` CLI/UX review polish.
+**Status:** Complete — `ISS-015`, `ISS-016`, `ISS-017`, `ISS-018`, and `ISS-019` done. Remaining
+pre-M8 work is `ISS-008`, the isolated-worker execution prerequisite.
 
 **What this merges:** three ideas that came up separately this session —
 "diff skills on regeneration," "let a failed skill propose its own fix," and the new request to
@@ -174,10 +173,11 @@ Draft(SKILL.md) → Critique → Generate(skill.py) → Validate → Test(smoke 
 1. `ISS-018` — **done.** Persist and report skill lifecycle state: durable candidate/lifecycle
    metadata, inspectable Markdown and JSON reports, baseline/diff/test/failure-context records;
    lightweight only, no dashboard unless explicitly requested.
-2. `ISS-019` — polish CLI UX for lifecycle review: `/skill help`, `/skill list`, generation
-   output, candidate review, diff display, and `/approve` messaging.
+2. `ISS-019` — **done.** Polish CLI UX for lifecycle review: `/skill review <name>`,
+   `/skill help`, `/skill list`, generation output, candidate review, diff display, and
+   `/approve` messaging.
 3. Revisit `ISS-008` as the M8 prerequisite.
-4. Start M8 after the closeout and prerequisite decisions are resolved.
+4. Start M8 after the prerequisite is resolved.
 
 ---
 

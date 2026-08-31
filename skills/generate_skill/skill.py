@@ -518,12 +518,9 @@ class GenerateSkill(Skill):
         return "\n".join(lines)
 
     def _next_steps(self, skill_name: str, skill_path: Path, mode: str) -> list[str]:
-        if mode == "create":
-            review_step = f"Review:  /skill help {skill_name}"
-        else:
-            review_step = f"Review:  {skill_path}"
         return [
-            review_step,
+            f"Review:  /skill review {skill_name}",
+            f"Files:   {skill_path}",
             f"Approve: /approve {skill_name}",
             f"Run:     /skill {skill_name}",
         ]

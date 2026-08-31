@@ -47,7 +47,6 @@ issue's own section below the index, not in the index table — keeps the table 
 | ID | Status | Milestone | Title | Branch |
 | --- | --- | --- | --- | --- |
 | ISS-008 | open | Gated (M8 prereq) | Full isolated-worker execution for skills/dynamic tools | — |
-| ISS-019 | open | M7 closeout | Polish CLI UX for lifecycle review | — |
 
 ## Closed Index
 
@@ -70,6 +69,7 @@ issue's own section below the index, not in the index table — keeps the table 
 | ISS-016 | done | M7 | Show diff when regenerating an existing skill | implement-m7-skill-lifecycle |
 | ISS-017 | done | M7 | Propose skill revisions from failure context | implement-m7-skill-lifecycle |
 | ISS-018 | done | M7 closeout | Persist and report skill lifecycle state | iss-018-lifecycle-reports |
+| ISS-019 | done | M7 closeout | Polish CLI UX for lifecycle review | iss-019-lifecycle-cli-polish |
 
 ---
 
@@ -87,19 +87,28 @@ issue's own section below the index, not in the index table — keeps the table 
 - **Status:** tracked for future consideration, not started — also a prerequisite for
   Milestone 8 (`docs/ROADMAP_PLAN.md`), not just "eventually"
 
+---
+
+## Closed — Detail
+
 ### ISS-019 — Polish CLI UX for lifecycle review
 - **Milestone:** M7 closeout
 - **Source:** 2026-08-30 user-directed M7 closeout split after completion of `ISS-015`,
   `ISS-016`, and `ISS-017`
-- **What:** make the human review path for lifecycle proposals clear and predictable.
-- **Scope:** improve `/skill help`, `/skill list`, generation output, candidate review, diff
-  display, and `/approve` messaging around lifecycle proposals and candidates.
-- **Order:** do after `ISS-018`, then revisit `ISS-008`, then proceed to M8.
-- **Status:** open, not started.
-
----
-
-## Closed — Detail
+- **Fix:** added `/skill review <skill-name>` as the lifecycle review command. It summarizes
+  `ISS-018` lifecycle report JSON when available and falls back to Markdown if the JSON report is
+  missing or corrupt.
+- **CLI behavior:** `/skill list` marks pending `.candidate` proposals and points to
+  `/skill review`; `/skill help <skill-name>` shows pending-candidate review and approval
+  commands; generated skill output now points to `/skill review <skill-name>` before approval.
+- **Approval behavior:** approving a valid candidate now states that a candidate was promoted and
+  shows the retained lifecycle report path when present. Invalid candidate approval failures keep
+  the original skill in place and point reviewers back to `/skill review`.
+- **Safety:** review commands read persisted reports and candidate state only; they do not approve,
+  load, or execute proposed skills.
+- **Tests:** added CLI review/list/help coverage in `tests/test_special_commands.py` and approval
+  message assertions in `tests/test_generate_skill.py`. Validation: `uv run pytest -q` -> 170
+  passed, 1 skipped; `uv run python -m compileall -q py_mono skills` -> exit 0.
 
 ### ISS-018 — Persist and report skill lifecycle state
 - **Milestone:** M7 closeout

@@ -5,11 +5,12 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass
+from json import JSONDecodeError
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from py_mono.skill.diffing import ArtifactDiff
+from py_mono.skill.diffing import ArtifactDiff, candidate_dir_for, has_candidate
 from py_mono.skill.lifecycle import LifecycleStageResult, SkillLifecycleRun, SmokeTestResult
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,18 @@ class ReportWriteResult:
     report_dir: Path
     markdown_path: Optional[Path] = None
     json_path: Optional[Path] = None
+    error: str = ""
+
+
+@dataclass
+class LifecycleReportView:
+    skill_name: str
+    report_dir: Path
+    markdown_path: Path
+    json_path: Path
+    has_candidate: bool
+    data: Optional[dict[str, Any]] = None
+    markdown: str = ""
     error: str = ""
 
 
@@ -81,6 +94,73 @@ def write_lifecycle_report(
             report_dir=report_dir,
             error=f"{exc.__class__.__name__}: {exc}",
         )
+
+
+def load_lifecycle_report_view(skill_name: str, skill_dir: Path) -> LifecycleReportView:
+    candidate_dir = candidate_dir_for(skill_dir)
+    pending_candidate = has_candidate(skill_dir)
+    report_dir = candidate_dir if pending_candidate else skill_dir
+    markdown_path = report_dir / REPORT_MD
+    json_path = report_dir / REPORT_JSON
+
+    if json_path.exists():
+        try:
+            data = json.loads(json_path.read_text(encoding="utf-8"))
+            return LifecycleReportView(
+                skill_name=skill_name,
+                report_dir=report_dir,
+                markdown_path=markdown_path,
+                json_path=json_path,
+                has_candidate=pending_candidate,
+                data=data,
+            )
+        except (OSError, JSONDecodeError) as exc:
+            markdown = _read_markdown_fallback(markdown_path)
+            return LifecycleReportView(
+                skill_name=skill_name,
+                report_dir=report_dir,
+                markdown_path=markdown_path,
+                json_path=json_path,
+                has_candidate=pending_candidate,
+                markdown=markdown,
+                error=f"{exc.__class__.__name__}: {exc}",
+            )
+
+    markdown = _read_markdown_fallback(markdown_path)
+    return LifecycleReportView(
+        skill_name=skill_name,
+        report_dir=report_dir,
+        markdown_path=markdown_path,
+        json_path=json_path,
+        has_candidate=pending_candidate,
+        markdown=markdown,
+        error="" if markdown else "No lifecycle report found.",
+    )
+
+
+def render_lifecycle_review(view: LifecycleReportView) -> str:
+    lines = [f"Review: {view.skill_name}"]
+    if view.has_candidate:
+        lines.append(f"Candidate: {view.report_dir}")
+
+    if view.data is not None:
+        return "\n".join(lines + _render_json_summary(view))
+
+    if view.markdown:
+        if view.error:
+            lines.append(f"Lifecycle report JSON unavailable: {view.error}")
+        lines.append(f"Lifecycle report: {view.markdown_path}")
+        lines.append("")
+        lines.append(_preview_markdown(view.markdown))
+        lines.append("")
+        lines.append(f"Approve: /approve {view.skill_name}")
+        return "\n".join(lines)
+
+    lines.append(view.error or "No lifecycle report found.")
+    if view.has_candidate:
+        lines.append(f"Candidate exists, but no lifecycle report was found at {view.report_dir}.")
+    lines.append(f"Approve: /approve {view.skill_name}")
+    return "\n".join(lines)
 
 
 def build_lifecycle_report_record(
@@ -219,3 +299,75 @@ def _failure_context_record(failure_context: Any) -> Optional[dict[str, str]]:
         "model": str(getattr(failure_context, "model", "")),
         "timestamp": str(getattr(failure_context, "timestamp", "")),
     }
+
+
+def _read_markdown_fallback(markdown_path: Path) -> str:
+    try:
+        if markdown_path.exists():
+            return markdown_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    return ""
+
+
+def _render_json_summary(view: LifecycleReportView) -> list[str]:
+    data = view.data or {}
+    lines = [
+        f"Status: {data.get('status', '<unknown>')}",
+        f"Mode: {data.get('mode', '<unknown>')}",
+        f"Lifecycle report: {view.json_path}",
+    ]
+    if data.get("candidate_path"):
+        lines.append(f"Candidate path: {data['candidate_path']}")
+    if data.get("timestamp"):
+        lines.append(f"Timestamp: {data['timestamp']}")
+
+    stages = data.get("stages") or []
+    if stages:
+        lines.extend(["", "Stages:"])
+        for stage in stages:
+            lines.append(
+                "  - "
+                f"{stage.get('stage', '<unknown>')}: "
+                f"{stage.get('status', '<unknown>')} - "
+                f"{stage.get('message', '')}"
+            )
+
+    smoke = data.get("smoke_test")
+    if smoke:
+        lines.extend(["", "Smoke test:"])
+        lines.append(f"  - Status: {smoke.get('status', '<unknown>')}")
+        if smoke.get("request"):
+            lines.append(f"  - Request: {smoke['request']}")
+        if smoke.get("output_preview"):
+            lines.append(f"  - Output preview: {smoke['output_preview']}")
+        if smoke.get("failure_reason"):
+            lines.append(f"  - Failure: {smoke['failure_reason']}")
+
+    diffs = data.get("diffs") or []
+    if diffs:
+        lines.extend(["", "Diffs:"])
+        for diff in diffs:
+            if not diff.get("baseline_available", False):
+                summary = "baseline unavailable"
+            elif diff.get("changed", False):
+                summary = "changed"
+            else:
+                summary = "no changes"
+            lines.append(f"  - {diff.get('artifact', '<unknown>')}: {summary}")
+
+    next_steps = data.get("next_steps") or [f"Approve: /approve {view.skill_name}"]
+    lines.extend(["", "Next steps:"])
+    for index, step in enumerate(next_steps, 1):
+        lines.append(f"  {index}. {step}")
+    if not any("/approve " in step for step in next_steps):
+        lines.append(f"  {len(next_steps) + 1}. Approve: /approve {view.skill_name}")
+    return lines
+
+
+def _preview_markdown(markdown: str, max_lines: int = 80) -> str:
+    lines = markdown.splitlines()
+    preview = lines[:max_lines]
+    if len(lines) > max_lines:
+        preview.append("...")
+    return "\n".join(preview)

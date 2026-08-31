@@ -25,6 +25,7 @@ import yaml
 from typing import Dict, List, Optional, TypedDict, TYPE_CHECKING
 
 from py_mono.skill import approval_ledger
+from py_mono.skill.diffing import has_candidate
 
 if TYPE_CHECKING:
     from py_mono.session.session_manager import SessionManager
@@ -41,6 +42,7 @@ class ListedSkill(TypedDict):
     description: str
     status: str
     has_code: bool
+    has_candidate: bool
 
 
 # ---------------------------------------------------------------------------
@@ -299,6 +301,7 @@ class SkillRegistry:
                 # it's currently loaded — a proposed or hash-mismatched skill
                 # still has code, it's just not executing yet (see ISS-003).
                 "has_code": self._has_code.get(name, False),
+                "has_candidate": has_candidate(self._skill_dir_for(name)),
             })
         return results
 
@@ -309,6 +312,9 @@ class SkillRegistry:
             return skill_md.read_text(encoding="utf-8")
         return None
 
+    def skill_dir_for(self, skill_name: str) -> Path:
+        return self._skill_dir_for(skill_name)
+
     # -------------------------
     # Helpers
     # -------------------------
@@ -316,7 +322,13 @@ class SkillRegistry:
         raw_dir = self.skills_dir / skill_name
         if raw_dir.exists():
             return raw_dir
-        return self.skills_dir / self._norm(skill_name)
+        normalized_dir = self.skills_dir / self._norm(skill_name)
+        if normalized_dir.exists():
+            return normalized_dir
+        hyphenated_dir = self.skills_dir / self._norm(skill_name).replace("_", "-")
+        if hyphenated_dir.exists():
+            return hyphenated_dir
+        return normalized_dir
 
     def _parse_skill_md(self, skill_md: Path) -> dict:
         try:

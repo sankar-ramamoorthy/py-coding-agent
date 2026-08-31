@@ -319,6 +319,10 @@ context for evolution, and the next review/approval steps.
 
 See [`README_Skills.md`](./README_Skills.md) for the skills-layer architecture (Reasoning / Orchestration / Execution layers, ADR-010 approval gate, and how this differs from Claude-style Markdown-only skills) and [`docs/skills.md`](./docs/skills.md) for the full per-skill reference (args, triggers, failure modes). Those files are the single source of truth for the skill list — it isn't duplicated here.
 
+Use `/skill review <skill_name>` to summarize the latest lifecycle report from the CLI before
+approval. `/skill list` and `/skill help <skill_name>` also show when a pending candidate exists
+and point back to the review command.
+
 ### Current Limitations
 
 * No persistent memory across sessions  

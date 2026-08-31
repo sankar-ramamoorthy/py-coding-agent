@@ -2,7 +2,7 @@
 
 ## Active branch
 
-`iss-018-lifecycle-reports`
+`iss-019-lifecycle-cli-polish`
 
 ## What was just finished
 
@@ -17,17 +17,21 @@
 - M7 core was committed and merged to `main` in commit `5113903`.
 - `ISS-018` is implemented on this branch: generated, regenerated, evolved, and failed lifecycle
   attempts now write durable Markdown and JSON lifecycle reports next to the proposed artifacts.
+- `ISS-019` is implemented on this branch: `/skill review <name>` summarizes lifecycle reports,
+  `/skill list` and `/skill help <name>` surface pending candidates, generation output points to
+  review, and `/approve` explains candidate promotion/rejection.
 
 ## Why
 
-The first M7 closeout item is complete on this branch. The remaining pre-M8 order is `ISS-019`
-for CLI review polish, then `ISS-008` for isolated-worker execution.
+The M7 closeout items are complete through `ISS-019`. The remaining pre-M8 item is `ISS-008`
+for isolated-worker execution.
 
 ## Not being worked on right now
 
 - `ISS-008` (full isolated-worker-with-RPC execution for skills/tools) remains gated and
   deferred as an M8 prerequisite.
-- `ISS-019` CLI/UX polish is intentionally separate from the core M7 slices.
+- `ISS-008` (full isolated-worker-with-RPC execution for skills/tools) remains the last pre-M8
+  issue to complete.
 
 ## Milestone note
 
@@ -37,4 +41,4 @@ M7 known core slices as of 2026-08-30:
 - `ISS-016`: diff-on-regeneration -- done.
 - `ISS-017`: failure-driven skill evolution -- done.
 - `ISS-018`: persistence/reporting closeout -- done on branch `iss-018-lifecycle-reports`.
-- `ISS-019`: CLI/UX review polish closeout -- open.
+- `ISS-019`: CLI/UX review polish closeout -- done on branch `iss-019-lifecycle-cli-polish`.

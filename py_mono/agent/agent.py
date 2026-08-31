@@ -13,6 +13,11 @@ from py_mono.skill.approval import run_skill_safe, ApprovalError,wrap_agent_tool
 from py_mono.skill.validator import validate_skill_py
 from py_mono.skill import approval_ledger
 from py_mono.skill.diffing import candidate_dir_for, has_candidate, promote_candidate
+from py_mono.skill.reporting import (
+    REPORT_MD,
+    load_lifecycle_report_view,
+    render_lifecycle_review,
+)
 from py_mono.playbook.playbookregistry import PlaybookRegistry
 from py_mono.tools.tool_loader import load_dynamic_tools
 from pathlib import Path
@@ -100,6 +105,8 @@ class Agent:
             return True
         if text == "/skill list":
             return True
+        if text.startswith("/skill review "):
+            return True
         if text.startswith("/skill help "):
             return True
         if text.startswith("/skill info "):
@@ -177,6 +184,10 @@ class Agent:
         # ------------------------------------------------------------------
         if text == "/skill list":
             return self._handle_skill_list()
+
+        if text.startswith("/skill review "):
+            skill_name = text[len("/skill review "):].strip().lower()
+            return self._handle_skill_review(skill_name)
 
         if text.startswith("/skill help "):
             skill_name = text[len("/skill help "):].strip().lower()
@@ -265,6 +276,7 @@ class Agent:
             desc = s["description"]
             status = s["status"]
             has_code = s["has_code"]
+            pending_candidate = s.get("has_candidate", False)
 
             icon = "✅" if status == "approved" else "🔒"
             code_note = "" if has_code else " (spec only)"
@@ -272,6 +284,9 @@ class Agent:
             lines.append(f"{icon} {name}")
             lines.append(f"   {desc}{code_note}")
             lines.append(f"   Status: {status}")
+            if pending_candidate:
+                lines.append("   Pending candidate: yes")
+                lines.append(f"   Review with: /skill review {name}")
 
             if status == "approved":
                 lines.append(f"   Use: /skill {name}")
@@ -290,7 +305,36 @@ class Agent:
         content = self.skill_registry.get_skill_md(skill_name)
         if content is None:
             return f"[SKILL] No skill named '{skill_name}' found."
-        return f"--- SKILL.md: {skill_name} ---\n{content}"
+        lines = [f"--- SKILL.md: {skill_name} ---", content]
+        skill_dir = self.skill_registry.skill_dir_for(skill_name)
+        if has_candidate(skill_dir):
+            lines.extend(
+                [
+                    "",
+                    "Pending candidate: yes",
+                    f"Review candidate: /skill review {skill_name}",
+                    f"Approve candidate: /approve {skill_name}",
+                ]
+            )
+        return "\n".join(lines)
+
+    def _handle_skill_review(self, skill_name: str) -> str:
+        """Return lifecycle report and candidate review state for a skill."""
+        if self.skill_registry is None:
+            return "[SKILL] No skill registry configured."
+        if not skill_name:
+            return "Usage: /skill review <skill-name>"
+
+        skill_dir = self.skill_registry.skill_dir_for(skill_name)
+        if not skill_dir.exists():
+            available = [s["name"] for s in self.skill_registry.list_skills()]
+            return (
+                f"[SKILL] No skill named '{skill_name}' found.\n"
+                f"Available: {', '.join(available) or 'none'}"
+            )
+
+        view = load_lifecycle_report_view(skill_name, skill_dir)
+        return render_lifecycle_review(view)
 
     def _handle_skill_run(self, text: str) -> str:
         """
@@ -366,6 +410,8 @@ class Agent:
             return "[SKILL] No skill registry configured."
 
         skill_dir = self.skill_registry.skills_dir / skill_name
+        promoted_candidate = False
+        retained_report_path = skill_dir / REPORT_MD
         if has_candidate(skill_dir):
             candidate_py_path = candidate_dir_for(skill_dir) / "skill.py"
             code = candidate_py_path.read_text(encoding="utf-8")
@@ -373,10 +419,12 @@ class Agent:
             if not result.valid:
                 return (
                     f"[APPROVE] Candidate for skill '{skill_name}' failed validation — not approved.\n"
-                    f"{result.failure_reason()}"
+                    f"{result.failure_reason()}\n"
+                    f"Review candidate with: /skill review {skill_name}"
                 )
             if not promote_candidate(skill_dir):
                 return f"[APPROVE] Candidate for skill '{skill_name}' could not be promoted."
+            promoted_candidate = True
             self.skill_registry.reload_skill(skill_name)
 
         # Check skill exists
@@ -454,8 +502,22 @@ class Agent:
 
         return (
             f"✅ Skill '{skill_name}' approved and ready.\n"
-            f"Run it with: /skill {skill_name}"
+            f"{self._approval_review_lines(skill_name, promoted_candidate, retained_report_path)}"
         )
+
+    def _approval_review_lines(
+        self,
+        skill_name: str,
+        promoted_candidate: bool,
+        retained_report_path: Path,
+    ) -> str:
+        lines = []
+        if promoted_candidate:
+            lines.append("Candidate promoted: yes")
+            if retained_report_path.exists():
+                lines.append(f"Retained lifecycle report: {retained_report_path}")
+        lines.append(f"Run it with: /skill {skill_name}")
+        return "\n".join(lines)
 
 
     def _format_playbooks_for_prompt(self, playbooks) -> str:

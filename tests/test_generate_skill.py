@@ -265,7 +265,10 @@ def test_approve_promotes_regeneration_candidate_and_records_ledger(tmp_path, mo
     result = agent._handle_skill_approve("echo-request")
 
     assert "approved and ready" in result
+    assert "Candidate promoted: yes" in result
+    assert "Retained lifecycle report:" in result
     assert not (skill_dir / ".candidate").exists()
+    assert (skill_dir / "lifecycle_report.json").exists()
     assert 'return request' in (skill_dir / "skill.py").read_text(encoding="utf-8")
     ledger = approval_ledger.load_ledger(approval_ledger.ledger_path_for(tmp_path))
     assert approval_ledger.is_approved(ledger, "echo-request", skill_dir / "skill.py")
@@ -287,6 +290,7 @@ def test_approve_rejects_invalid_candidate_without_overwriting_original(tmp_path
     result = agent._handle_skill_approve("echo-request")
 
     assert "failed validation" in result
+    assert "Review candidate with: /skill review echo-request" in result
     assert (skill_dir / "skill.py").read_text(encoding="utf-8") == original_code
     assert (candidate_dir / "skill.py").exists()
 
