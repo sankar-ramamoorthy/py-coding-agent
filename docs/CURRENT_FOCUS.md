@@ -26,12 +26,63 @@
 
 ## Why
 
-All tracked pre-M8 issues are complete and merged to `main`. This branch is positioned for the
-next decision: whether to start M8 skill provenance/sharing.
+All tracked pre-M8 issues are complete and merged to `main`. The repo is at a planning boundary:
+M8 skill provenance/sharing is no longer assumed to be the automatic next milestone.
+
+## Current planning direction
+
+Evidence labels to preserve when discussing future work:
+
+- IMPLEMENTED
+- PLANNED
+- PROPOSED
+- EXPERIMENT
+- LEARNING NOTE
+- DEFERRED
+- REJECTED
+
+Current position:
+
+- IMPLEMENTED: M6 Reliability Foundation is complete.
+- IMPLEMENTED: M7 Skill Lifecycle Graph is complete.
+- IMPLEMENTED: Pre-M8 work is complete.
+- IMPLEMENTED: Current repo state is clean and validation was green at the last recorded
+  full validation.
+- PROPOSED: The next investigation should prioritize repo-local usability before assuming a new
+  architecture milestone.
+
+Preferred next sequence:
+
+1. Repo-local usability
+   - PROPOSED: Target normal interaction should be `cd <repo> && py-agent`.
+   - PROPOSED: The current repository should become the workspace automatically.
+   - PROPOSED: Normal use should not require running from the py-coding-agent source repo,
+     manually passing paths, invoking internal modules, manually operating Docker, or
+     understanding worker topology.
+   - PROPOSED: Preferred architecture direction to investigate is a host-side CLI/control plane
+     with Docker-backed execution hidden underneath it.
+   - DEFERRED: Treat this as a direction to investigate, not implemented architecture.
+2. Real-world dogfooding
+   - EXPERIMENT: Once usability is adequate, use py-coding-agent on real bounded tasks in
+     unrelated repositories.
+   - LEARNING NOTE: Gather evidence about task success, awkwardness, failures, retries, skill
+     usefulness, human intervention, state loss, and provider/model fit.
+3. Evidence-driven next architecture
+   - PROPOSED: Let observed failures determine whether durability/resume, observability, routing,
+     stronger isolation, provenance/sharing, or another capability deserves the next milestone.
+   - DEFERRED: Do not start provenance/sharing merely because it had previously been called M8.
+
+Guiding principle:
+
+`simple outside, disciplined inside`
+
+`real usage -> observed failure -> justified architecture`
 
 ## Not being worked on right now
 
 - M8 skill provenance/sharing remains a product-scope decision, not active implementation.
+- No new issues, milestones, ADRs, Spec Kit plans, branches, or code changes are active from this
+  note.
 
 ## Milestone note
 
